@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="text-center mt-5">
+    <h1 class="display-4 fw-bold text-dark mb-4">可待预约</h1>
+    <p class="lead text-muted">输入8位活动码开始取号</p>
+    
+    <div class="card p-4 mx-auto" style="max-width: 400px;">
+        <form action="{{ url_for('book_entry') }}" method="POST">
+            <div class="mb-3">
+                <input type="number" name="code" class="form-control form-control-lg text-center" placeholder="88888888" required pattern="\d{8}">
+            </div>
+            <button type="submit" class="btn btn-primary w-100 btn-lg">进入活动</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

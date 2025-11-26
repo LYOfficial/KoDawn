@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<h4 class="mb-3">你好，放号员 {{ current_user.username }}</h4>
+<p class="text-muted">所属项目：{{ project.name }}</p>
+
+<div class="list-group">
+    {% for act in project.activities %}
+    <a href="{{ url_for('slot_manage', activity_id=act.id) }}" class="list-group-item list-group-item-action">
+        <div class="d-flex w-100 justify-content-between">
+            <h5 class="mb-1">{{ act.name }}</h5>
+            <small>码: {{ act.code }}</small>
+        </div>
+        <p class="mb-1">截止日期: {{ act.end_date }}</p>
+    </a>
+    {% endfor %}
+</div>
+{% endblock %}

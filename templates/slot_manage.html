@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4>{{ activity.name }} - 放号</h4>
+    <a href="/dispatcher" class="btn btn-sm btn-outline-secondary">返回</a>
+</div>
+
+<div class="card p-3 mb-4">
+    <h5>新增时段</h5>
+    <form method="POST">
+        <div class="row mb-2">
+            <div class="col-6">
+                <label>开始时间</label>
+                <input type="datetime-local" name="start_time" class="form-control" required>
+            </div>
+            <div class="col-6">
+                <label>结束时间</label>
+                <input type="datetime-local" name="end_time" class="form-control" required>
+            </div>
+        </div>
+        <div class="mb-2">
+            <label>可预约人数</label>
+            <input type="number" name="capacity" class="form-control" value="1" required>
+        </div>
+        <!-- 动态字段 -->
+        {% for field in fields %}
+        <div class="mb-2">
+            <label>{{ field }}</label>
+            <input type="text" name="field_{{ field }}" class="form-control" required>
+        </div>
+        {% endfor %}
+        <button type="submit" class="btn btn-success w-100 mt-2">提交放号</button>
+    </form>
+</div>
+
+<h5 class="mb-3">我的放号记录</h5>
+{% for s in slots %}
+<div class="card p-3 {% if s.current_count >= s.capacity %}border-secondary bg-light{% else %}border-primary{% endif %}">
+    <div class="d-flex justify-content-between">
+        <strong>{{ s.start_time.strftime('%m-%d %H:%M') }} - {{ s.end_time.strftime('%H:%M') }}</strong>
+        <span class="badge {% if s.current_count >= s.capacity %}bg-secondary{% else %}bg-success{% endif %}">
+            {{ s.current_count }} / {{ s.capacity }}
+        </span>
+    </div>
+    <hr class="my-2">
+    <div class="text-muted small">
+        {% for k, v in s.data.items() %}
+            {{ k }}: {{ v }} &nbsp;
+        {% endfor %}
+    </div>
+</div>
+{% endfor %}
+{% endblock %}

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<h4 class="mb-3">项目管理</h4>
+<button class="btn btn-success mb-3 w-100" type="button" data-bs-toggle="collapse" data-bs-target="#newProject">
+    + 新建项目
+</button>
+
+<div class="collapse mb-3" id="newProject">
+    <div class="card p-3">
+        <form action="{{ url_for('create_project') }}" method="POST">
+            <div class="mb-3">
+                <label>项目名称</label>
+                <input type="text" name="name" class="form-control" required>
+            </div>
+            <button type="submit" class="btn btn-primary">创建</button>
+        </form>
+    </div>
+</div>
+
+<div class="list-group">
+    {% for p in projects %}
+    <a href="{{ url_for('project_edit', project_id=p.id) }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+        <div>
+            <h5 class="mb-1">{{ p.name }}</h5>
+            <small class="text-muted">项目码: {{ p.code }}</small>
+        </div>
+        <span class="badge bg-primary rounded-pill">管理 ></span>
+    </a>
+    {% endfor %}
+</div>
+{% endblock %}

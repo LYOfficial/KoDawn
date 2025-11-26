@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="text-center mb-4">
+    <h3>{{ activity.name }}</h3>
+    <p class="text-muted">请选择合适的时间段</p>
+</div>
+
+<div class="row">
+    {% for s in slots %}
+    <div class="col-md-6">
+        <div class="card p-3 slot-card {% if s.remain <= 0 %}slot-full{% else %}border-primary{% endif %}" 
+             {% if s.remain > 0 %}onclick="location.href='{{ url_for('booking_form', code_str=activity.code, slot_id=s.id) }}'"{% endif %}>
+            
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="mb-0">{{ s.start_time.strftime('%Y-%m-%d') }}</h5>
+                    <div class="fw-bold text-primary">{{ s.start_time.strftime('%H:%M') }} - {{ s.end_time.strftime('%H:%M') }}</div>
+                </div>
+                <div class="text-end">
+                    {% if s.remain > 0 %}
+                        <span class="badge bg-success">余 {{ s.remain }}</span>
+                    {% else %}
+                        <span class="badge bg-secondary">已满</span>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="mt-2 text-muted small border-top pt-2">
+                {% for k, v in s.data.items() %}
+                    <div><strong>{{ k }}:</strong> {{ v }}</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="text-center text-muted mt-5">
+        <p>暂无放号，请稍后再来。</p>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
