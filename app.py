@@ -282,7 +282,8 @@ def book_entry():
     if not act:
         flash('无效的活动编号')
         return redirect(url_for('index'))
-    return redirect(url_for('booking_list', code=code))
+    # --- 修复点：这里将 code=code 改为了 code_str=code ---
+    return redirect(url_for('booking_list', code_str=code))
 
 @app.route('/book/<code_str>')
 def booking_list(code_str):
