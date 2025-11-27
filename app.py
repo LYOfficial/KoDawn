@@ -22,7 +22,7 @@ class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(128))
-    role = db.Column(db.String(20))  # 'admin' 或 'dispatcher'
+    role = db.Column(db.String(20))
     project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=True)
 
     def set_password(self, password):
@@ -36,11 +36,13 @@ class Project(db.Model):
     code = db.Column(db.String(6), unique=True, nullable=False)
     name = db.Column(db.String(100), nullable=False)
     
+    # 【新增】自定义称谓
+    dispatcher_label = db.Column(db.String(50), default="放号员") # 例如：医生、讲师
+    booker_label = db.Column(db.String(50), default="取号员")     # 例如：患者、学生
+
     # 字段配置
-    dispatcher_fields = db.Column(db.String(500), default="诊室,详情") # 放号员填的
-    booker_fields = db.Column(db.String(500), default="姓名,电话")    # 取号员填的
-    
-    # 【新增】配置放号员能看到取号员的哪些字段 (例如: "姓名" - 不包含电话)
+    dispatcher_fields = db.Column(db.String(500), default="诊室,详情")
+    booker_fields = db.Column(db.String(500), default="姓名,电话")
     dispatcher_visible_fields = db.Column(db.String(500), default="姓名") 
     
     allow_edit = db.Column(db.Boolean, default=True)
@@ -59,7 +61,7 @@ class Slot(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     activity_id = db.Column(db.Integer, db.ForeignKey('activity.id'), nullable=False)
     dispatcher_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    dispatcher = db.relationship('User', backref='slots') # 关联用户方便查询
+    dispatcher = db.relationship('User', backref='slots')
     start_time = db.Column(db.DateTime, nullable=False)
     end_time = db.Column(db.DateTime, nullable=False)
     capacity = db.Column(db.Integer, default=1)
@@ -171,9 +173,12 @@ def project_edit(project_id):
     if request.method == 'POST':
         action = request.form.get('action')
         if action == 'update_config':
+            # 保存自定义称谓
+            project.dispatcher_label = request.form.get('dispatcher_label', '放号员')
+            project.booker_label = request.form.get('booker_label', '取号员')
+            
             project.dispatcher_fields = request.form.get('dispatcher_fields')
             project.booker_fields = request.form.get('booker_fields')
-            # 新增：更新可见权限
             project.dispatcher_visible_fields = request.form.get('dispatcher_visible_fields')
             project.allow_edit = True if request.form.get('allow_edit') else False
             db.session.commit()
@@ -189,7 +194,7 @@ def project_edit(project_id):
                 u.set_password(pwd)
                 db.session.add(u)
                 db.session.commit()
-                flash('放号员添加成功')
+                flash(f'{project.dispatcher_label}添加成功')
         
         elif action == 'create_activity':
             aname = request.form.get('name')
@@ -221,7 +226,6 @@ def delete_activity(activity_id):
     flash('活动已删除')
     return redirect(url_for('project_edit', project_id=pid))
 
-# 【新增】管理员查看活动详情（上帝视角）
 @app.route('/admin/activity/<int:activity_id>')
 @login_required
 def admin_activity_detail(activity_id):
@@ -229,7 +233,6 @@ def admin_activity_detail(activity_id):
     activity = Activity.query.get_or_404(activity_id)
     slots = Slot.query.filter_by(activity_id=activity.id).order_by(Slot.start_time).all()
     
-    # 预处理数据
     for s in slots:
         s.data = json.loads(s.info_json) if s.info_json else {}
         for b in s.bookings:
@@ -274,11 +277,10 @@ def slot_manage(activity_id):
         )
         db.session.add(slot)
         db.session.commit()
-        flash('放号成功')
+        flash('发布成功')
 
     my_slots = Slot.query.filter_by(activity_id=activity.id, dispatcher_id=current_user.id).order_by(Slot.start_time).all()
     
-    # 预处理数据
     visible_keys = [k.strip() for k in activity.project.dispatcher_visible_fields.split(',') if k.strip()]
     
     for s in my_slots:
@@ -286,7 +288,6 @@ def slot_manage(activity_id):
         s.booking_list_processed = []
         for b in s.bookings:
             raw_data = json.loads(b.booker_json) if b.booker_json else {}
-            # 【关键】根据管理员配置，过滤字段
             filtered_data = {k: v for k, v in raw_data.items() if k in visible_keys}
             s.booking_list_processed.append(filtered_data)
 

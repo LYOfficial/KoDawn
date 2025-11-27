@@ -25,7 +25,6 @@
                 <span class="fw-bold">{{ act.name }}</span> <span class="badge bg-secondary">{{ act.code }}</span>
             </div>
             <div>
-                <!-- 注意：这里的变量是 act，不是 activity -->
                 <a href="{{ url_for('admin_activity_detail', activity_id=act.id) }}" class="btn btn-sm btn-info text-white me-2">数据</a>
                 <a href="{{ url_for('delete_activity', activity_id=act.id) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('确定删除？')">删除</a>
             </div>
@@ -36,27 +35,41 @@
 
 <!-- 配置字段 -->
 <div class="card p-3 border-warning mb-4">
-    <h5 class="text-warning">权限与字段配置</h5>
+    <h5 class="text-warning">项目与权限设置</h5>
     <form method="POST">
         <input type="hidden" name="action" value="update_config">
+        
+        <div class="row mb-3">
+            <div class="col-6">
+                <label class="form-label text-primary fw-bold">1. 自定义放号人员称谓</label>
+                <input type="text" name="dispatcher_label" class="form-control" value="{{ project.dispatcher_label }}">
+                <div class="form-text">默认: 放号员 (可改为 医生/老师)</div>
+            </div>
+            <div class="col-6">
+                <label class="form-label text-primary fw-bold">2. 自定义取号人员称谓</label>
+                <input type="text" name="booker_label" class="form-control" value="{{ project.booker_label }}">
+                <div class="form-text">默认: 取号员 (可改为 患者/学生)</div>
+            </div>
+        </div>
+
         <div class="mb-3">
-            <label class="form-label fw-bold">1. 放号员放号时需填字段</label>
+            <label class="form-label fw-bold">3. {{ project.dispatcher_label }}需填字段</label>
             <input type="text" name="dispatcher_fields" class="form-control" value="{{ project.dispatcher_fields }}">
-            <div class="form-text">放号员可见。例如: 诊室,详情</div>
+            <div class="form-text">放号时填写。例如: 诊室,详情</div>
         </div>
         <div class="mb-3">
-            <label class="form-label fw-bold">2. 取号员取号时需填字段</label>
+            <label class="form-label fw-bold">4. {{ project.booker_label }}需填字段</label>
             <input type="text" name="booker_fields" class="form-control" value="{{ project.booker_fields }}">
-            <div class="form-text">取号员可见。例如: 姓名,手机,身份证</div>
+            <div class="form-text">取号时填写。例如: 姓名,手机,身份证</div>
         </div>
         <div class="mb-3">
-            <label class="form-label fw-bold text-danger">3. 放号员能看到取号员的哪些字段？</label>
+            <label class="form-label fw-bold text-danger">5. {{ project.dispatcher_label }}能看到{{ project.booker_label }}的哪些字段？</label>
             <input type="text" name="dispatcher_visible_fields" class="form-control" value="{{ project.dispatcher_visible_fields }}">
-            <div class="form-text">从第2项中挑选，保护隐私。例如只填: 姓名</div>
+            <div class="form-text">保护隐私。例如只填: 姓名</div>
         </div>
         <div class="form-check mb-3">
             <input class="form-check-input" type="checkbox" name="allow_edit" id="allowEdit" {% if project.allow_edit %}checked{% endif %}>
-            <label class="form-check-label" for="allowEdit">允许放号员修改已提交的时段/删除时段</label>
+            <label class="form-check-label" for="allowEdit">允许{{ project.dispatcher_label }}修改已提交的时段/删除时段</label>
         </div>
         <button class="btn btn-warning w-100">保存配置</button>
     </form>
@@ -64,7 +77,7 @@
 
 <!-- 放号员账号管理 -->
 <div class="card p-3">
-    <h5>放号员账号管理</h5>
+    <h5>{{ project.dispatcher_label }}账号管理</h5>
     <form method="POST" class="row g-2 mb-3">
         <input type="hidden" name="action" value="create_dispatcher">
         <div class="col-5">

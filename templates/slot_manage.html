@@ -34,7 +34,7 @@
 </div>
 
 <!-- 我的放号记录 -->
-<h5 class="mb-3">我的放号与预约详情</h5>
+<h5 class="mb-3">记录与{{ activity.project.booker_label }}名单</h5>
 {% for s in slots %}
 <div class="card mb-3">
     <div class="card-header d-flex justify-content-between align-items-center">
@@ -48,7 +48,8 @@
     </div>
     <div class="card-body">
         <div class="mb-2 text-muted small">
-            放号信息: 
+            <!-- 这里也可以显示自定义称谓 -->
+            {{ activity.project.dispatcher_label }}信息: 
             {% for k, v in s.data.items() %}
                 <span class="badge bg-light text-dark border">{{ k }}: {{ v }}</span>
             {% endfor %}
@@ -73,7 +74,7 @@
             {% endfor %}
         </ul>
         {% else %}
-            <p class="text-muted small mb-0">暂无预约</p>
+            <p class="text-muted small mb-0">暂无{{ activity.project.booker_label }}预约</p>
         {% endif %}
     </div>
 </div>

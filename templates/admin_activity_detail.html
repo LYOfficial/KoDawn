@@ -3,7 +3,6 @@
 <nav aria-label="breadcrumb">
   <ol class="breadcrumb">
     <li class="breadcrumb-item"><a href="/admin">首页</a></li>
-    <!-- 只有这里才能用 activity.project.id -->
     <li class="breadcrumb-item"><a href="{{ url_for('project_edit', project_id=activity.project.id) }}">项目管理</a></li>
     <li class="breadcrumb-item active">数据详情</li>
   </ol>
@@ -19,10 +18,10 @@
         <thead class="table-dark">
             <tr>
                 <th>时间段</th>
-                <th>放号员</th>
+                <th>{{ activity.project.dispatcher_label }}</th>
                 <th>放号信息</th>
                 <th>进度</th>
-                <th>取号详情 (管理员可见所有)</th>
+                <th>{{ activity.project.booker_label }}详情 (管理员可见所有)</th>
             </tr>
         </thead>
         <tbody>

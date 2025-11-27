@@ -2,7 +2,7 @@
 {% block content %}
 <div class="text-center mb-4">
     <h3>{{ activity.name }}</h3>
-    <p class="text-muted">请选择合适的时间段</p>
+    <p class="text-muted">你好，{{ activity.project.booker_label }}，请选择时间</p>
 </div>
 
 <div class="row">
@@ -26,6 +26,7 @@
             </div>
             
             <div class="mt-2 text-muted small border-top pt-2">
+                {{ activity.project.dispatcher_label }}:
                 {% for k, v in s.data.items() %}
                     <div><strong>{{ k }}:</strong> {{ v }}</div>
                 {% endfor %}
@@ -34,7 +35,7 @@
     </div>
     {% else %}
     <div class="text-center text-muted mt-5">
-        <p>暂无放号，请稍后再来。</p>
+        <p>暂无号源，请稍后再来。</p>
     </div>
     {% endfor %}
 </div>

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-<h4 class="mb-3">你好，放号员 {{ current_user.username }}</h4>
+<h4 class="mb-3">你好，{{ project.dispatcher_label }} {{ current_user.username }}</h4>
 <p class="text-muted">所属项目：{{ project.name }}</p>
 
 <div class="list-group">
