@@ -3,13 +3,13 @@
 <nav aria-label="breadcrumb">
   <ol class="breadcrumb">
     <li class="breadcrumb-item"><a href="/admin">首页</a></li>
-    <li class="breadcrumb-item active">{{ project.name }} ({{ project.code }})</li>
+    <li class="breadcrumb-item active">{{ project.name }}</li>
   </ol>
 </nav>
 
-<!-- 活动管理 -->
+<!-- 活动列表区域 -->
 <div class="card p-3 mb-4">
-    <h5>活动管理 (8位数码)</h5>
+    <h5>活动列表</h5>
     <form method="POST" class="mb-3">
         <input type="hidden" name="action" value="create_activity">
         <div class="input-group">
@@ -33,62 +33,95 @@
     </div>
 </div>
 
-<!-- 配置字段 -->
+<!-- 核心配置区域 -->
 <div class="card p-3 border-warning mb-4">
-    <h5 class="text-warning">项目与权限设置</h5>
+    <h5 class="text-warning">项目核心配置</h5>
     <form method="POST">
         <input type="hidden" name="action" value="update_config">
         
+        <!-- 称谓配置 -->
         <div class="row mb-3">
             <div class="col-6">
-                <label class="form-label text-primary fw-bold">1. 自定义放号人员称谓</label>
+                <label class="form-label fw-bold">1. 放号方称谓</label>
                 <input type="text" name="dispatcher_label" class="form-control" value="{{ project.dispatcher_label }}">
-                <div class="form-text">默认: 放号员 (可改为 医生/老师)</div>
             </div>
             <div class="col-6">
-                <label class="form-label text-primary fw-bold">2. 自定义取号人员称谓</label>
+                <label class="form-label fw-bold">2. 取号方称谓</label>
                 <input type="text" name="booker_label" class="form-control" value="{{ project.booker_label }}">
-                <div class="form-text">默认: 取号员 (可改为 患者/学生)</div>
             </div>
         </div>
 
+        <!-- 字段配置 -->
         <div class="mb-3">
-            <label class="form-label fw-bold">3. {{ project.dispatcher_label }}需填字段</label>
+            <label class="form-label fw-bold">3. 放号需填字段</label>
             <input type="text" name="dispatcher_fields" class="form-control" value="{{ project.dispatcher_fields }}">
-            <div class="form-text">放号时填写。例如: 诊室,详情</div>
         </div>
         <div class="mb-3">
-            <label class="form-label fw-bold">4. {{ project.booker_label }}需填字段</label>
+            <label class="form-label fw-bold">4. 取号需填字段</label>
             <input type="text" name="booker_fields" class="form-control" value="{{ project.booker_fields }}">
-            <div class="form-text">取号时填写。例如: 姓名,手机,身份证</div>
         </div>
         <div class="mb-3">
-            <label class="form-label fw-bold text-danger">5. {{ project.dispatcher_label }}能看到{{ project.booker_label }}的哪些字段？</label>
+            <label class="form-label fw-bold text-danger">5. 放号方可见隐私字段</label>
             <input type="text" name="dispatcher_visible_fields" class="form-control" value="{{ project.dispatcher_visible_fields }}">
-            <div class="form-text">保护隐私。例如只填: 姓名</div>
         </div>
-        <div class="form-check mb-3">
+
+        <hr>
+
+        <!-- 时间模式配置 (新功能) -->
+        <h6 class="text-primary fw-bold">时间选择模式</h6>
+        <div class="mb-3">
+            <select class="form-select" name="time_mode" id="timeModeSelect" onchange="toggleTimeConfig()">
+                <option value="manual" {% if project.time_mode == 'manual' %}selected{% endif %}>1. 手动选择 (精确日期时间)</option>
+                <option value="class" {% if project.time_mode == 'class' %}selected{% endif %}>2. 周课节选择 (学校/排班)</option>
+                <option value="hourly" {% if project.time_mode == 'hourly' %}selected{% endif %}>3. 按小时选择 (00:00-24:00)</option>
+            </select>
+        </div>
+
+        <!-- 只有非手动模式才显示周几选择 -->
+        <div id="weekdayConfig" class="mb-3" style="display:none;">
+            <label class="form-label fw-bold">本周开放哪些天放号？</label><br>
+            <div class="btn-group" role="group">
+                {% set days = ['周一','周二','周三','周四','周五','周六','周日'] %}
+                {% for i in range(7) %}
+                <input type="checkbox" class="btn-check" name="allowed_weekdays" id="wd{{i}}" value="{{i}}" {% if i|string in allowed_wd %}checked{% endif %}>
+                <label class="btn btn-outline-primary" for="wd{{i}}">{{ days[i] }}</label>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- 只有课节模式才显示课节表 -->
+        <div id="sectionConfig" class="mb-3" style="display:none;">
+            <label class="form-label fw-bold">课节设置</label>
+            <div id="sectionContainer">
+                {% for sec in sections %}
+                <div class="input-group mb-2 sec-row">
+                    <input type="text" name="sec_name[]" class="form-control" placeholder="名称" value="{{ sec.name }}">
+                    <input type="time" name="sec_start[]" class="form-control" value="{{ sec.start }}">
+                    <span class="input-group-text">-</span>
+                    <input type="time" name="sec_end[]" class="form-control" value="{{ sec.end }}">
+                    <button type="button" class="btn btn-outline-danger" onclick="removeRow(this)">X</button>
+                </div>
+                {% endfor %}
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-success" onclick="addSection()">+ 增加一节</button>
+        </div>
+
+        <div class="form-check mb-3 mt-3">
             <input class="form-check-input" type="checkbox" name="allow_edit" id="allowEdit" {% if project.allow_edit %}checked{% endif %}>
-            <label class="form-check-label" for="allowEdit">允许{{ project.dispatcher_label }}修改已提交的时段/删除时段</label>
+            <label class="form-check-label" for="allowEdit">允许修改/删除</label>
         </div>
-        <button class="btn btn-warning w-100">保存配置</button>
+        <button class="btn btn-warning w-100">保存所有配置</button>
     </form>
 </div>
 
-<!-- 放号员账号管理 -->
+<!-- 人员管理 -->
 <div class="card p-3">
-    <h5>{{ project.dispatcher_label }}账号管理</h5>
+    <h5>人员管理</h5>
     <form method="POST" class="row g-2 mb-3">
         <input type="hidden" name="action" value="create_dispatcher">
-        <div class="col-5">
-            <input type="text" name="username" class="form-control" placeholder="用户名" required>
-        </div>
-        <div class="col-5">
-            <input type="text" name="password" class="form-control" placeholder="密码" required>
-        </div>
-        <div class="col-2">
-            <button class="btn btn-primary w-100">加</button>
-        </div>
+        <div class="col-5"><input type="text" name="username" class="form-control" placeholder="用户名" required></div>
+        <div class="col-5"><input type="text" name="password" class="form-control" placeholder="密码" required></div>
+        <div class="col-2"><button class="btn btn-primary w-100">加</button></div>
     </form>
     <ul class="list-group">
         {% for d in project.dispatchers %}
@@ -97,10 +130,41 @@
     </ul>
 </div>
 
-<div class="mt-4">
-    <form method="POST" onsubmit="return confirm('确定删除整个项目？不可恢复！')">
-        <input type="hidden" name="action" value="delete_project">
-        <button class="btn btn-outline-danger w-100 btn-sm">删除本项目</button>
-    </form>
-</div>
+<script>
+function toggleTimeConfig() {
+    var mode = document.getElementById('timeModeSelect').value;
+    var wd = document.getElementById('weekdayConfig');
+    var sec = document.getElementById('sectionConfig');
+    
+    if (mode === 'manual') {
+        wd.style.display = 'none';
+        sec.style.display = 'none';
+    } else if (mode === 'hourly') {
+        wd.style.display = 'block';
+        sec.style.display = 'none';
+    } else if (mode === 'class') {
+        wd.style.display = 'block';
+        sec.style.display = 'block';
+    }
+}
+// 初始化运行一次
+toggleTimeConfig();
+
+function addSection() {
+    var div = document.createElement('div');
+    div.className = 'input-group mb-2 sec-row';
+    div.innerHTML = `
+        <input type="text" name="sec_name[]" class="form-control" placeholder="名称">
+        <input type="time" name="sec_start[]" class="form-control">
+        <span class="input-group-text">-</span>
+        <input type="time" name="sec_end[]" class="form-control">
+        <button type="button" class="btn btn-outline-danger" onclick="removeRow(this)">X</button>
+    `;
+    document.getElementById('sectionContainer').appendChild(div);
+}
+
+function removeRow(btn) {
+    btn.parentElement.remove();
+}
+</script>
 {% endblock %}

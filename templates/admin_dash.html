@@ -19,13 +19,18 @@
 
 <div class="list-group">
     {% for p in projects %}
-    <a href="{{ url_for('project_edit', project_id=p.id) }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-        <div>
+    <div class="list-group-item d-flex justify-content-between align-items-center">
+        <!-- 点击名字进入管理 -->
+        <a href="{{ url_for('project_edit', project_id=p.id) }}" class="text-decoration-none text-dark flex-grow-1">
             <h5 class="mb-1">{{ p.name }}</h5>
             <small class="text-muted">项目码: {{ p.code }}</small>
+        </a>
+        
+        <div>
+            <a href="{{ url_for('project_edit', project_id=p.id) }}" class="btn btn-sm btn-outline-primary me-1">管理</a>
+            <a href="{{ url_for('delete_project_direct', project_id=p.id) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('警告：确定要删除【{{ p.name }}】吗？这会清空该项目下所有数据！')">删除</a>
         </div>
-        <span class="badge bg-primary rounded-pill">管理 ></span>
-    </a>
+    </div>
     {% endfor %}
 </div>
 {% endblock %}

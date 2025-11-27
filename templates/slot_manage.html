@@ -5,10 +5,13 @@
     <a href="/dispatcher" class="btn btn-sm btn-outline-secondary">返回</a>
 </div>
 
-<!-- 新增时段表单 -->
+<!-- 发布区域 -->
 <div class="card p-3 mb-4 border-primary">
     <h5 class="text-primary">发布新号源</h5>
     <form method="POST">
+        
+        {% if activity.project.time_mode == 'manual' %}
+        <!-- 模式1: 手动时间 -->
         <div class="row mb-2">
             <div class="col-6">
                 <label>开始时间</label>
@@ -19,49 +22,73 @@
                 <input type="datetime-local" name="end_time" class="form-control" required>
             </div>
         </div>
+
+        {% else %}
+        <!-- 模式2&3: 课节/小时 (日期 + 下拉) -->
+        <div class="row mb-2">
+            <div class="col-6">
+                <label>选择日期</label>
+                <input type="date" name="select_date" class="form-control" required>
+                <div class="form-text small">仅允许: 
+                    {% set days = ['周一','周二','周三','周四','周五','周六','周日'] %}
+                    {% for d in activity.project.allowed_weekdays.split(',') %}
+                        {{ days[d|int] }} 
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="col-6">
+                <label>选择时段</label>
+                <select name="time_range" class="form-select" required>
+                    <option value="">请选择...</option>
+                    {% for opt in time_options %}
+                    <option value="{{ opt.value }}">{{ opt.label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        {% endif %}
+
         <div class="mb-2">
             <label>名额数量</label>
             <input type="number" name="capacity" class="form-control" value="1" required>
         </div>
+        
         {% for field in fields %}
         <div class="mb-2">
             <label>{{ field }}</label>
             <input type="text" name="field_{{ field }}" class="form-control" required>
         </div>
         {% endfor %}
+        
         <button type="submit" class="btn btn-primary w-100 mt-2">发布</button>
     </form>
 </div>
 
-<!-- 我的放号记录 -->
-<h5 class="mb-3">记录与{{ activity.project.booker_label }}名单</h5>
+<!-- 记录区域 -->
+<h5 class="mb-3">记录与预约详情</h5>
 {% for s in slots %}
 <div class="card mb-3">
     <div class="card-header d-flex justify-content-between align-items-center">
         <span>
-            <strong>{{ s.start_time.strftime('%m-%d %H:%M') }}</strong> 
-            <small class="text-muted">至 {{ s.end_time.strftime('%H:%M') }}</small>
+            <strong>{{ s.start_time.strftime('%m-%d') }}</strong> 
+            {{ s.start_time.strftime('%H:%M') }}-{{ s.end_time.strftime('%H:%M') }}
         </span>
         {% if activity.project.allow_edit %}
-        <a href="{{ url_for('delete_slot', slot_id=s.id) }}" class="text-danger small text-decoration-none" onclick="return confirm('删除将取消该时段所有预约，确定？')">删除</a>
+        <a href="{{ url_for('delete_slot', slot_id=s.id) }}" class="text-danger small text-decoration-none" onclick="return confirm('确定删除？')">删除</a>
         {% endif %}
     </div>
     <div class="card-body">
         <div class="mb-2 text-muted small">
-            <!-- 这里也可以显示自定义称谓 -->
-            {{ activity.project.dispatcher_label }}信息: 
             {% for k, v in s.data.items() %}
                 <span class="badge bg-light text-dark border">{{ k }}: {{ v }}</span>
             {% endfor %}
         </div>
-        
         <div class="progress mb-3" style="height: 20px;">
             {% set percent = (s.current_count / s.capacity * 100) if s.capacity > 0 else 0 %}
             <div class="progress-bar {% if percent >= 100 %}bg-secondary{% else %}bg-success{% endif %}" role="progressbar" style="width: {{ percent }}%;">
                 {{ s.current_count }} / {{ s.capacity }}
             </div>
         </div>
-
         {% if s.booking_list_processed %}
         <ul class="list-group list-group-flush small">
             {% for b_data in s.booking_list_processed %}
@@ -73,8 +100,6 @@
             </li>
             {% endfor %}
         </ul>
-        {% else %}
-            <p class="text-muted small mb-0">暂无{{ activity.project.booker_label }}预约</p>
         {% endif %}
     </div>
 </div>
