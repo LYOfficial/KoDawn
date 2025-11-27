@@ -2,6 +2,8 @@
 *.sqlite3
 kodawn.db
 
+instance/
+
 __pycache__/
 *.py[cod]
 *$py.class
