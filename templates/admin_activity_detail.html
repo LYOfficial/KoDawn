@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="/admin">首页</a></li>
+    <!-- 只有这里才能用 activity.project.id -->
+    <li class="breadcrumb-item"><a href="{{ url_for('project_edit', project_id=activity.project.id) }}">项目管理</a></li>
+    <li class="breadcrumb-item active">数据详情</li>
+  </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3>{{ activity.name }} - 数据总览</h3>
+    <span class="badge bg-primary fs-6">{{ activity.code }}</span>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-bordered table-striped bg-white">
+        <thead class="table-dark">
+            <tr>
+                <th>时间段</th>
+                <th>放号员</th>
+                <th>放号信息</th>
+                <th>进度</th>
+                <th>取号详情 (管理员可见所有)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in slots %}
+            <tr>
+                <td style="min-width: 120px;">
+                    {{ s.start_time.strftime('%Y-%m-%d') }}<br>
+                    {{ s.start_time.strftime('%H:%M') }} - {{ s.end_time.strftime('%H:%M') }}
+                </td>
+                <td>{{ s.dispatcher.username }}</td>
+                <td>
+                    {% for k, v in s.data.items() %}
+                        <div class="small"><strong>{{ k }}:</strong> {{ v }}</div>
+                    {% endfor %}
+                </td>
+                <td>
+                    <span class="badge {% if s.current_count >= s.capacity %}bg-secondary{% else %}bg-success{% endif %}">
+                        {{ s.current_count }} / {{ s.capacity }}
+                    </span>
+                </td>
+                <td>
+                    {% if s.bookings %}
+                        <ul class="list-unstyled mb-0">
+                        {% for b in s.bookings %}
+                            <li class="mb-2 border-bottom pb-1">
+                                <small class="text-muted">{{ b.created_at.strftime('%m-%d %H:%M') }} 提交</small><br>
+                                {% for k, v in b.data.items() %}
+                                    <span class="me-2"><strong>{{ k }}:</strong> {{ v }}</span>
+                                {% endfor %}
+                            </li>
+                        {% endfor %}
+                        </ul>
+                    {% else %}
+                        <span class="text-muted small">暂无</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if not slots %}
+<div class="text-center p-5 text-muted">
+    暂无放号数据
+</div>
+{% endif %}
+{% endblock %}

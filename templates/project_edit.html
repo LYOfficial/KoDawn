@@ -14,23 +14,57 @@
         <input type="hidden" name="action" value="create_activity">
         <div class="input-group">
             <input type="text" name="name" class="form-control" placeholder="活动名称" required>
-            <input type="number" name="days" class="form-control" placeholder="持续天数" value="7" style="max-width: 80px;">
+            <input type="number" name="days" class="form-control" placeholder="天数" value="7" style="max-width: 80px;">
             <button class="btn btn-success">新建</button>
         </div>
     </form>
-    <ul class="list-group">
+    <div class="list-group">
         {% for act in project.activities %}
-        <li class="list-group-item d-flex justify-content-between align-items-center">
-            <span>{{ act.name }} <span class="badge bg-secondary">{{ act.code }}</span></span>
-            <a href="{{ url_for('delete_activity', activity_id=act.id) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('确定删除？')">删除</a>
-        </li>
+        <div class="list-group-item d-flex justify-content-between align-items-center">
+            <div>
+                <span class="fw-bold">{{ act.name }}</span> <span class="badge bg-secondary">{{ act.code }}</span>
+            </div>
+            <div>
+                <!-- 注意：这里的变量是 act，不是 activity -->
+                <a href="{{ url_for('admin_activity_detail', activity_id=act.id) }}" class="btn btn-sm btn-info text-white me-2">数据</a>
+                <a href="{{ url_for('delete_activity', activity_id=act.id) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('确定删除？')">删除</a>
+            </div>
+        </div>
         {% endfor %}
-    </ul>
+    </div>
 </div>
 
-<!-- 放号员管理 -->
-<div class="card p-3 mb-4">
-    <h5>放号员列表</h5>
+<!-- 配置字段 -->
+<div class="card p-3 border-warning mb-4">
+    <h5 class="text-warning">权限与字段配置</h5>
+    <form method="POST">
+        <input type="hidden" name="action" value="update_config">
+        <div class="mb-3">
+            <label class="form-label fw-bold">1. 放号员放号时需填字段</label>
+            <input type="text" name="dispatcher_fields" class="form-control" value="{{ project.dispatcher_fields }}">
+            <div class="form-text">放号员可见。例如: 诊室,详情</div>
+        </div>
+        <div class="mb-3">
+            <label class="form-label fw-bold">2. 取号员取号时需填字段</label>
+            <input type="text" name="booker_fields" class="form-control" value="{{ project.booker_fields }}">
+            <div class="form-text">取号员可见。例如: 姓名,手机,身份证</div>
+        </div>
+        <div class="mb-3">
+            <label class="form-label fw-bold text-danger">3. 放号员能看到取号员的哪些字段？</label>
+            <input type="text" name="dispatcher_visible_fields" class="form-control" value="{{ project.dispatcher_visible_fields }}">
+            <div class="form-text">从第2项中挑选，保护隐私。例如只填: 姓名</div>
+        </div>
+        <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" name="allow_edit" id="allowEdit" {% if project.allow_edit %}checked{% endif %}>
+            <label class="form-check-label" for="allowEdit">允许放号员修改已提交的时段/删除时段</label>
+        </div>
+        <button class="btn btn-warning w-100">保存配置</button>
+    </form>
+</div>
+
+<!-- 放号员账号管理 -->
+<div class="card p-3">
+    <h5>放号员账号管理</h5>
     <form method="POST" class="row g-2 mb-3">
         <input type="hidden" name="action" value="create_dispatcher">
         <div class="col-5">
@@ -50,31 +84,10 @@
     </ul>
 </div>
 
-<!-- 配置字段 -->
-<div class="card p-3 border-warning">
-    <h5 class="text-warning">系统配置</h5>
-    <form method="POST">
-        <input type="hidden" name="action" value="update_config">
-        <div class="mb-3">
-            <label class="form-label">放号员需填字段 (逗号分隔)</label>
-            <input type="text" name="dispatcher_fields" class="form-control" value="{{ project.dispatcher_fields }}">
-            <div class="form-text">例如: 医生姓名,诊室位置</div>
-        </div>
-        <div class="mb-3">
-            <label class="form-label">取号员需填字段 (逗号分隔)</label>
-            <input type="text" name="booker_fields" class="form-control" value="{{ project.booker_fields }}">
-            <div class="form-text">例如: 姓名,手机号,身份证</div>
-        </div>
-        <div class="form-check mb-3">
-            <input class="form-check-input" type="checkbox" name="allow_edit" id="allowEdit" {% if project.allow_edit %}checked{% endif %}>
-            <label class="form-check-label" for="allowEdit">允许放号员修改已提交内容</label>
-        </div>
-        <button class="btn btn-warning w-100">保存配置</button>
+<div class="mt-4">
+    <form method="POST" onsubmit="return confirm('确定删除整个项目？不可恢复！')">
+        <input type="hidden" name="action" value="delete_project">
+        <button class="btn btn-outline-danger w-100 btn-sm">删除本项目</button>
     </form>
 </div>
-
-<form method="POST" onsubmit="return confirm('确定删除整个项目？不可恢复！')">
-    <input type="hidden" name="action" value="delete_project">
-    <button class="btn btn-danger w-100">删除本项目</button>
-</form>
 {% endblock %}

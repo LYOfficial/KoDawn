@@ -1,12 +1,13 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
-    <h4>{{ activity.name }} - 放号</h4>
+    <h4>{{ activity.name }}</h4>
     <a href="/dispatcher" class="btn btn-sm btn-outline-secondary">返回</a>
 </div>
 
-<div class="card p-3 mb-4">
-    <h5>新增时段</h5>
+<!-- 新增时段表单 -->
+<div class="card p-3 mb-4 border-primary">
+    <h5 class="text-primary">发布新号源</h5>
     <form method="POST">
         <div class="row mb-2">
             <div class="col-6">
@@ -19,34 +20,61 @@
             </div>
         </div>
         <div class="mb-2">
-            <label>可预约人数</label>
+            <label>名额数量</label>
             <input type="number" name="capacity" class="form-control" value="1" required>
         </div>
-        <!-- 动态字段 -->
         {% for field in fields %}
         <div class="mb-2">
             <label>{{ field }}</label>
             <input type="text" name="field_{{ field }}" class="form-control" required>
         </div>
         {% endfor %}
-        <button type="submit" class="btn btn-success w-100 mt-2">提交放号</button>
+        <button type="submit" class="btn btn-primary w-100 mt-2">发布</button>
     </form>
 </div>
 
-<h5 class="mb-3">我的放号记录</h5>
+<!-- 我的放号记录 -->
+<h5 class="mb-3">我的放号与预约详情</h5>
 {% for s in slots %}
-<div class="card p-3 {% if s.current_count >= s.capacity %}border-secondary bg-light{% else %}border-primary{% endif %}">
-    <div class="d-flex justify-content-between">
-        <strong>{{ s.start_time.strftime('%m-%d %H:%M') }} - {{ s.end_time.strftime('%H:%M') }}</strong>
-        <span class="badge {% if s.current_count >= s.capacity %}bg-secondary{% else %}bg-success{% endif %}">
-            {{ s.current_count }} / {{ s.capacity }}
+<div class="card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>
+            <strong>{{ s.start_time.strftime('%m-%d %H:%M') }}</strong> 
+            <small class="text-muted">至 {{ s.end_time.strftime('%H:%M') }}</small>
         </span>
+        {% if activity.project.allow_edit %}
+        <a href="{{ url_for('delete_slot', slot_id=s.id) }}" class="text-danger small text-decoration-none" onclick="return confirm('删除将取消该时段所有预约，确定？')">删除</a>
+        {% endif %}
     </div>
-    <hr class="my-2">
-    <div class="text-muted small">
-        {% for k, v in s.data.items() %}
-            {{ k }}: {{ v }} &nbsp;
-        {% endfor %}
+    <div class="card-body">
+        <div class="mb-2 text-muted small">
+            放号信息: 
+            {% for k, v in s.data.items() %}
+                <span class="badge bg-light text-dark border">{{ k }}: {{ v }}</span>
+            {% endfor %}
+        </div>
+        
+        <div class="progress mb-3" style="height: 20px;">
+            {% set percent = (s.current_count / s.capacity * 100) if s.capacity > 0 else 0 %}
+            <div class="progress-bar {% if percent >= 100 %}bg-secondary{% else %}bg-success{% endif %}" role="progressbar" style="width: {{ percent }}%;">
+                {{ s.current_count }} / {{ s.capacity }}
+            </div>
+        </div>
+
+        {% if s.booking_list_processed %}
+        <ul class="list-group list-group-flush small">
+            {% for b_data in s.booking_list_processed %}
+            <li class="list-group-item bg-light">
+                <span class="text-primary fw-bold">已约:</span> 
+                {% for k, v in b_data.items() %}
+                    {{ k }}: {{ v }} &nbsp;
+                {% endfor %}
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+            <p class="text-muted small mb-0">暂无预约</p>
+        {% endif %}
     </div>
 </div>
 {% endfor %}

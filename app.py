@@ -23,7 +23,6 @@ class User(UserMixin, db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(128))
     role = db.Column(db.String(20))  # 'admin' 或 'dispatcher'
-    # 放号员所属的项目ID，管理员为None
     project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=True)
 
     def set_password(self, password):
@@ -34,38 +33,44 @@ class User(UserMixin, db.Model):
 
 class Project(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    code = db.Column(db.String(6), unique=True, nullable=False) # 6位项目编号
+    code = db.Column(db.String(6), unique=True, nullable=False)
     name = db.Column(db.String(100), nullable=False)
-    # 存储字段配置，用英文逗号分隔，例如 "姓名,电话"
-    dispatcher_fields = db.Column(db.String(500), default="诊室,详情")
-    booker_fields = db.Column(db.String(500), default="姓名,电话")
-    allow_edit = db.Column(db.Boolean, default=True) # 是否允许放号员修改
+    
+    # 字段配置
+    dispatcher_fields = db.Column(db.String(500), default="诊室,详情") # 放号员填的
+    booker_fields = db.Column(db.String(500), default="姓名,电话")    # 取号员填的
+    
+    # 【新增】配置放号员能看到取号员的哪些字段 (例如: "姓名" - 不包含电话)
+    dispatcher_visible_fields = db.Column(db.String(500), default="姓名") 
+    
+    allow_edit = db.Column(db.Boolean, default=True)
     activities = db.relationship('Activity', backref='project', cascade="all, delete-orphan")
     dispatchers = db.relationship('User', backref='project', cascade="all, delete-orphan")
 
 class Activity(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    code = db.Column(db.String(8), unique=True, nullable=False) # 8位活动编号
+    code = db.Column(db.String(8), unique=True, nullable=False)
     name = db.Column(db.String(100), nullable=False)
     project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=False)
-    end_date = db.Column(db.Date, nullable=True) # 过期日期
+    end_date = db.Column(db.Date, nullable=True)
     slots = db.relationship('Slot', backref='activity', cascade="all, delete-orphan")
 
 class Slot(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     activity_id = db.Column(db.Integer, db.ForeignKey('activity.id'), nullable=False)
     dispatcher_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    dispatcher = db.relationship('User', backref='slots') # 关联用户方便查询
     start_time = db.Column(db.DateTime, nullable=False)
     end_time = db.Column(db.DateTime, nullable=False)
     capacity = db.Column(db.Integer, default=1)
     current_count = db.Column(db.Integer, default=0)
-    info_json = db.Column(db.Text) # 放号员填写的JSON数据
+    info_json = db.Column(db.Text)
     bookings = db.relationship('Booking', backref='slot', cascade="all, delete-orphan")
 
 class Booking(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     slot_id = db.Column(db.Integer, db.ForeignKey('slot.id'), nullable=False)
-    booker_json = db.Column(db.Text) # 取号员填写的JSON数据
+    booker_json = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.now)
 
 # --- 辅助函数 ---
@@ -75,24 +80,19 @@ def load_user(user_id):
     return User.query.get(int(user_id))
 
 def generate_code(length):
-    """生成指定长度的数字验证码"""
     while True:
         range_start = 10**(length-1)
         range_end = (10**length) - 1
         code = str(random.randint(range_start, range_end))
-        # 检查重复
         if length == 6:
-            if not Project.query.filter_by(code=code).first():
-                return code
+            if not Project.query.filter_by(code=code).first(): return code
         elif length == 8:
-            if not Activity.query.filter_by(code=code).first():
-                return code
+            if not Activity.query.filter_by(code=code).first(): return code
 
 # --- 命令行指令 ---
 
 @app.cli.command("create-admin")
 def create_admin():
-    """创建项目管理员账号"""
     username = input("请输入管理员用户名: ")
     password = input("请输入管理员密码: ")
     if User.query.filter_by(username=username).first():
@@ -104,13 +104,12 @@ def create_admin():
     db.session.commit()
     print(f"管理员 {username} 创建成功！")
 
-# --- 路由逻辑 ---
+# --- 通用路由 ---
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
-# 登录
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -119,10 +118,7 @@ def login():
         user = User.query.filter_by(username=username).first()
         if user and user.check_password(password):
             login_user(user)
-            if user.role == 'admin':
-                return redirect(url_for('admin_dash'))
-            else:
-                return redirect(url_for('dispatcher_dash'))
+            return redirect(url_for('admin_dash') if user.role == 'admin' else url_for('dispatcher_dash'))
         flash('用户名或密码错误')
     return render_template('login.html')
 
@@ -144,7 +140,7 @@ def profile():
             return redirect(url_for('logout'))
     return render_template('login.html', is_profile=True)
 
-# --- 项目管理员功能 ---
+# --- 管理员功能 ---
 
 @app.route('/admin')
 @login_required
@@ -173,11 +169,12 @@ def project_edit(project_id):
     project = Project.query.get_or_404(project_id)
     
     if request.method == 'POST':
-        # 更新项目设置
         action = request.form.get('action')
         if action == 'update_config':
             project.dispatcher_fields = request.form.get('dispatcher_fields')
             project.booker_fields = request.form.get('booker_fields')
+            # 新增：更新可见权限
+            project.dispatcher_visible_fields = request.form.get('dispatcher_visible_fields')
             project.allow_edit = True if request.form.get('allow_edit') else False
             db.session.commit()
             flash('设置已保存')
@@ -224,6 +221,22 @@ def delete_activity(activity_id):
     flash('活动已删除')
     return redirect(url_for('project_edit', project_id=pid))
 
+# 【新增】管理员查看活动详情（上帝视角）
+@app.route('/admin/activity/<int:activity_id>')
+@login_required
+def admin_activity_detail(activity_id):
+    if current_user.role != 'admin': abort(403)
+    activity = Activity.query.get_or_404(activity_id)
+    slots = Slot.query.filter_by(activity_id=activity.id).order_by(Slot.start_time).all()
+    
+    # 预处理数据
+    for s in slots:
+        s.data = json.loads(s.info_json) if s.info_json else {}
+        for b in s.bookings:
+            b.data = json.loads(b.booker_json) if b.booker_json else {}
+            
+    return render_template('admin_activity_detail.html', activity=activity, slots=slots)
+
 # --- 放号员功能 ---
 
 @app.route('/dispatcher')
@@ -241,11 +254,10 @@ def slot_manage(activity_id):
     if activity.project_id != current_user.project_id: abort(403)
 
     if request.method == 'POST':
-        start = request.form.get('start_time') # "2023-01-01T10:00"
+        start = request.form.get('start_time')
         end = request.form.get('end_time')
         capacity = int(request.form.get('capacity'))
         
-        # 处理动态字段
         fields = activity.project.dispatcher_fields.split(',')
         data = {}
         for f in fields:
@@ -264,14 +276,37 @@ def slot_manage(activity_id):
         db.session.commit()
         flash('放号成功')
 
-    # 获取当前放号员在该活动的放号记录
-    my_slots = Slot.query.filter_by(activity_id=activity.id, dispatcher_id=current_user.id).all()
-    # 解析JSON方便前端展示
+    my_slots = Slot.query.filter_by(activity_id=activity.id, dispatcher_id=current_user.id).order_by(Slot.start_time).all()
+    
+    # 预处理数据
+    visible_keys = [k.strip() for k in activity.project.dispatcher_visible_fields.split(',') if k.strip()]
+    
     for s in my_slots:
         s.data = json.loads(s.info_json) if s.info_json else {}
+        s.booking_list_processed = []
+        for b in s.bookings:
+            raw_data = json.loads(b.booker_json) if b.booker_json else {}
+            # 【关键】根据管理员配置，过滤字段
+            filtered_data = {k: v for k, v in raw_data.items() if k in visible_keys}
+            s.booking_list_processed.append(filtered_data)
 
     fields = [f.strip() for f in activity.project.dispatcher_fields.split(',') if f.strip()]
     return render_template('slot_manage.html', activity=activity, slots=my_slots, fields=fields)
+
+@app.route('/dispatcher/delete_slot/<int:slot_id>')
+@login_required
+def delete_slot(slot_id):
+    slot = Slot.query.get_or_404(slot_id)
+    if current_user.role != 'dispatcher' or slot.dispatcher_id != current_user.id:
+        abort(403)
+    if not slot.activity.project.allow_edit:
+        flash('管理员已锁定修改权限')
+        return redirect(url_for('slot_manage', activity_id=slot.activity_id))
+        
+    db.session.delete(slot)
+    db.session.commit()
+    flash('时段已删除')
+    return redirect(url_for('slot_manage', activity_id=slot.activity_id))
 
 # --- 取号员功能 ---
 
@@ -282,23 +317,19 @@ def book_entry():
     if not act:
         flash('无效的活动编号')
         return redirect(url_for('index'))
-    # --- 修复点：这里将 code=code 改为了 code_str=code ---
     return redirect(url_for('booking_list', code_str=code))
 
 @app.route('/book/<code_str>')
 def booking_list(code_str):
     act = Activity.query.filter_by(code=code_str).first_or_404()
-    # 检查过期
     if act.end_date and act.end_date < datetime.now().date():
         flash('该活动已结束')
         return redirect(url_for('index'))
         
     slots = Slot.query.filter_by(activity_id=act.id).order_by(Slot.start_time).all()
-    # 处理数据显示
     valid_slots = []
     for s in slots:
         s.data = json.loads(s.info_json) if s.info_json else {}
-        # 计算剩余
         s.remain = s.capacity - s.current_count
         valid_slots.append(s)
         
@@ -329,7 +360,7 @@ def booking_form(code_str, slot_id):
     slot_info = json.loads(slot.info_json) if slot.info_json else {}
     return render_template('booking_form.html', slot=slot, slot_info=slot_info, fields=fields, activity=act)
 
-# --- 初始化数据库 ---
+# --- 初始化 ---
 with app.app_context():
     db.create_all()
 
