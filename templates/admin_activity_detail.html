@@ -21,7 +21,7 @@
                 <th>{{ activity.project.dispatcher_label }}</th>
                 <th>放号信息</th>
                 <th>进度</th>
-                <th>{{ activity.project.booker_label }}详情 (管理员可见所有)</th>
+                <th>{{ activity.project.booker_label }}详情 (含取号码)</th>
             </tr>
         </thead>
         <tbody>
@@ -33,9 +33,7 @@
                 </td>
                 <td>{{ s.dispatcher.username }}</td>
                 <td>
-                    {% for k, v in s.data.items() %}
-                        <div class="small"><strong>{{ k }}:</strong> {{ v }}</div>
-                    {% endfor %}
+                    {% for k, v in s.data.items() %}<div class="small"><strong>{{ k }}:</strong> {{ v }}</div>{% endfor %}
                 </td>
                 <td>
                     <span class="badge {% if s.current_count >= s.capacity %}bg-secondary{% else %}bg-success{% endif %}">
@@ -47,7 +45,8 @@
                         <ul class="list-unstyled mb-0">
                         {% for b in s.bookings %}
                             <li class="mb-2 border-bottom pb-1">
-                                <small class="text-muted">{{ b.created_at.strftime('%m-%d %H:%M') }} 提交</small><br>
+                                <span class="badge bg-warning text-dark">{{ b.booking_code }}</span>
+                                <small class="text-muted ms-2">{{ b.created_at.strftime('%m-%d %H:%M') }}</small><br>
                                 {% for k, v in b.data.items() %}
                                     <span class="me-2"><strong>{{ k }}:</strong> {{ v }}</span>
                                 {% endfor %}
@@ -65,8 +64,6 @@
 </div>
 
 {% if not slots %}
-<div class="text-center p-5 text-muted">
-    暂无放号数据
-</div>
+<div class="text-center p-5 text-muted">暂无放号数据</div>
 {% endif %}
 {% endblock %}

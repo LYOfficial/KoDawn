@@ -3,7 +3,11 @@
 <div class="text-center mt-5">
     <div class="mb-4 text-success" style="font-size: 5rem;">✓</div>
     <h2>预约成功！</h2>
-    <p class="text-muted">请截图保存此页面作为凭证。</p>
+    <div class="card p-4 mx-auto my-4 bg-light border-success" style="max-width: 400px;">
+        <p class="mb-1 text-muted">您的取号码</p>
+        <h1 class="display-3 fw-bold text-dark" style="letter-spacing: 5px;">{{ booking_code }}</h1>
+        <p class="small text-muted mt-2">请务必截图保存，用于查询或取消。</p>
+    </div>
     <a href="/book/{{ code }}" class="btn btn-outline-primary mt-3">返回活动首页</a>
 </div>
 {% endblock %}

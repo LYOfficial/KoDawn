@@ -1,12 +1,13 @@
 import os
 import random
 import json
-import click # 用于命令行参数
+import string
 from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, flash, abort
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
+from sqlalchemy import text # 用于执行原生SQL升级数据库
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'KoDawn-Secret-Key-Change-This'
@@ -23,7 +24,7 @@ class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(128))
-    role = db.Column(db.String(20)) # 'admin' 或 'dispatcher'
+    role = db.Column(db.String(20))
     project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=True)
 
     def set_password(self, password):
@@ -53,8 +54,16 @@ class Activity(db.Model):
     code = db.Column(db.String(8), unique=True, nullable=False)
     name = db.Column(db.String(100), nullable=False)
     project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=False)
-    end_date = db.Column(db.Date, nullable=True)
+    end_date = db.Column(db.Date, nullable=True) 
     slots = db.relationship('Slot', backref='activity', cascade="all, delete-orphan")
+    dispatcher_configs = db.relationship('DispatcherConfig', backref='activity', cascade="all, delete-orphan")
+
+class DispatcherConfig(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    activity_id = db.Column(db.Integer, db.ForeignKey('activity.id'), nullable=False)
+    dispatcher_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    enable_limit = db.Column(db.Boolean, default=False)
+    max_quota = db.Column(db.Integer, default=0)
 
 class Slot(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -71,6 +80,7 @@ class Slot(db.Model):
 class Booking(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     slot_id = db.Column(db.Integer, db.ForeignKey('slot.id'), nullable=False)
+    booking_code = db.Column(db.String(10), unique=True, nullable=True) # 升级时允许为空，之后填补
     booker_json = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.now)
 
@@ -89,6 +99,8 @@ def generate_code(length):
             if not Project.query.filter_by(code=code).first(): return code
         elif length == 8:
             if not Activity.query.filter_by(code=code).first(): return code
+        elif length == 10:
+            if not Booking.query.filter_by(booking_code=code).first(): return code
 
 def get_default_sections():
     return [
@@ -100,11 +112,59 @@ def get_default_sections():
         {"name": "第六节", "start": "19:30", "end": "21:00"}
     ]
 
-# --- 命令行指令 (新增用户管理功能) ---
+# --- 核心：数据库无损升级指令 ---
+
+@app.cli.command("update-db")
+def update_db_schema():
+    """【重要】升级数据库结构，保留旧数据"""
+    print("开始检查数据库结构...")
+    
+    # 1. 尝试创建所有新定义的表（如果表不存在，会自动创建；如果存在，会跳过）
+    db.create_all()
+    print("√ 基础表结构检查完成")
+
+    # 2. 补全新增的字段 (SQLite 不支持直接检查字段是否存在，所以我们尝试添加，失败则忽略)
+    # 格式: (表名, 字段名, 类型, 默认值)
+    migrations = [
+        ('activity', 'end_date', 'DATE', 'NULL'),
+        ('booking', 'booking_code', 'VARCHAR(10)', 'NULL'),
+        ('project', 'time_mode', 'VARCHAR(20)', "'manual'"),
+        ('project', 'class_sections_json', 'TEXT', "''"),
+        ('project', 'allowed_weekdays', 'VARCHAR(50)', "'0,1,2,3,4,5,6'"),
+        ('project', 'dispatcher_label', 'VARCHAR(50)', "'放号员'"),
+        ('project', 'booker_label', 'VARCHAR(50)', "'取号员'"),
+    ]
+
+    with db.engine.connect() as conn:
+        for table, col, col_type, default in migrations:
+            try:
+                # 尝试添加列
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {col_type} DEFAULT {default}"))
+                print(f"  + 已向 {table} 表添加新字段: {col}")
+            except Exception as e:
+                # 如果报错，说明字段可能已经存在，或者表不存在，我们忽略错误
+                pass
+        conn.commit()
+
+    # 3. 数据回填：为旧的预约记录生成取号码
+    print("检查旧数据完整性...")
+    bookings_without_code = Booking.query.filter(Booking.booking_code == None).all()
+    if bookings_without_code:
+        print(f"  > 发现 {len(bookings_without_code)} 个旧预约缺失取号码，正在生成...")
+        count = 0
+        for b in bookings_without_code:
+            b.booking_code = generate_code(10)
+            count += 1
+        db.session.commit()
+        print(f"  √ 已修复 {count} 条数据")
+    
+    print("\n恭喜！数据库升级完成，你可以正常启动网站了。")
+
+
+# --- 其他命令行指令 ---
 
 @app.cli.command("create-admin")
 def create_admin():
-    """创建项目管理员账号"""
     username = input("请输入管理员用户名: ")
     password = input("请输入管理员密码: ")
     if User.query.filter_by(username=username).first():
@@ -118,52 +178,26 @@ def create_admin():
 
 @app.cli.command("list-users")
 def list_users():
-    """【新】查看所有用户列表"""
     users = User.query.all()
-    print("-" * 60)
     print(f"{'ID':<5} | {'用户名':<20} | {'角色':<10} | {'项目ID'}")
-    print("-" * 60)
     for u in users:
         role_name = "项目管理员" if u.role == 'admin' else "放号员"
         pid = u.project_id if u.project_id else "N/A"
         print(f"{u.id:<5} | {u.username:<20} | {role_name:<10} | {pid}")
-    print("-" * 60)
 
 @app.cli.command("edit-user")
 def edit_user():
-    """【新】修改指定用户的账号或密码"""
-    list_users() # 先展示列表方便查看ID
-    print("\n--- 修改模式 ---")
+    list_users()
     user_id = input("请输入要修改的用户 ID: ")
-    if not user_id.isdigit():
-        print("无效的 ID")
-        return
-    
+    if not user_id.isdigit(): return
     user = User.query.get(int(user_id))
-    if not user:
-        print("找不到该用户")
-        return
-
-    print(f"当前修改对象: {user.username} ({'管理员' if user.role=='admin' else '放号员'})")
-    
-    new_username = input("请输入新用户名 (直接回车表示不修改): ")
-    if new_username:
-        if User.query.filter_by(username=new_username).first() and new_username != user.username:
-            print("错误：用户名已存在")
-            return
-        user.username = new_username
-        print("用户名已标记更新")
-
-    new_password = input("请输入新密码 (直接回车表示不修改): ")
-    if new_password:
-        user.set_password(new_password)
-        print("密码已标记更新")
-
-    if new_username or new_password:
-        db.session.commit()
-        print(">>> 修改成功！")
-    else:
-        print("未做任何修改")
+    if not user: return
+    new_username = input("新用户名 (回车跳过): ")
+    if new_username: user.username = new_username
+    new_password = input("新密码 (回车跳过): ")
+    if new_password: user.set_password(new_password)
+    db.session.commit()
+    print("修改成功")
 
 # --- 路由逻辑 ---
 
@@ -198,22 +232,16 @@ def logout():
 @login_required
 def profile():
     if request.method == 'POST':
-        # 【修改】严格的修改密码流程
         old_pass = request.form.get('old_password')
         new_pass = request.form.get('new_password')
         confirm_pass = request.form.get('confirm_password')
 
-        # 1. 验证原密码
         if not current_user.check_password(old_pass):
-            flash('原密码错误，请重试')
+            flash('原密码错误')
             return redirect(url_for('profile'))
-        
-        # 2. 验证两次新密码一致
         if new_pass != confirm_pass:
-            flash('两次输入的新密码不一致')
+            flash('两次新密码不一致')
             return redirect(url_for('profile'))
-        
-        # 3. 验证新密码不能为空
         if not new_pass:
              flash('新密码不能为空')
              return redirect(url_for('profile'))
@@ -221,7 +249,7 @@ def profile():
         current_user.set_password(new_pass)
         db.session.commit()
         flash('密码修改成功，请重新登录')
-        logout_user() # 强制登出让用户重登
+        logout_user()
         return redirect(url_for('login'))
         
     return render_template('login.html', is_profile=True)
@@ -274,7 +302,6 @@ def project_edit(project_id):
             project.booker_fields = request.form.get('booker_fields')
             project.dispatcher_visible_fields = request.form.get('dispatcher_visible_fields')
             project.allow_edit = True if request.form.get('allow_edit') else False
-            
             project.time_mode = request.form.get('time_mode')
             weekdays = request.form.getlist('allowed_weekdays')
             project.allowed_weekdays = ",".join(weekdays)
@@ -286,13 +313,8 @@ def project_edit(project_id):
                 new_sections = []
                 for i in range(len(sec_names)):
                     if sec_names[i] and sec_starts[i] and sec_ends[i]:
-                        new_sections.append({
-                            "name": sec_names[i],
-                            "start": sec_starts[i],
-                            "end": sec_ends[i]
-                        })
+                        new_sections.append({"name": sec_names[i], "start": sec_starts[i], "end": sec_ends[i]})
                 project.class_sections_json = json.dumps(new_sections)
-
             db.session.commit()
             flash('设置已保存')
         
@@ -310,10 +332,10 @@ def project_edit(project_id):
         
         elif action == 'create_activity':
             aname = request.form.get('name')
-            days = int(request.form.get('days', 7))
             acode = generate_code(8)
-            from datetime import timedelta
-            end_date = datetime.now() + timedelta(days=days)
+            end_date_str = request.form.get('end_date')
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date() if end_date_str else None
+            
             act = Activity(name=aname, code=acode, project_id=project.id, end_date=end_date)
             db.session.add(act)
             db.session.commit()
@@ -327,7 +349,6 @@ def project_edit(project_id):
 
     sections = json.loads(project.class_sections_json) if project.class_sections_json else get_default_sections()
     allowed_wd = project.allowed_weekdays.split(',') if project.allowed_weekdays else []
-    
     return render_template('project_edit.html', project=project, sections=sections, allowed_wd=allowed_wd)
 
 @app.route('/admin/delete_activity/<int:activity_id>')
@@ -372,7 +393,22 @@ def slot_manage(activity_id):
     project = activity.project
     if project.id != current_user.project_id: abort(403)
 
+    config = DispatcherConfig.query.filter_by(activity_id=activity.id, dispatcher_id=current_user.id).first()
+    if not config:
+        config = DispatcherConfig(activity_id=activity.id, dispatcher_id=current_user.id)
+        db.session.add(config)
+        db.session.commit()
+
     if request.method == 'POST':
+        action = request.form.get('action')
+        
+        if action == 'update_limit':
+            config.enable_limit = True if request.form.get('enable_limit') else False
+            config.max_quota = int(request.form.get('max_quota', 0))
+            db.session.commit()
+            flash('限额配置已更新')
+            return redirect(url_for('slot_manage', activity_id=activity.id))
+        
         capacity = int(request.form.get('capacity'))
         start_dt = None
         end_dt = None
@@ -390,9 +426,12 @@ def slot_manage(activity_id):
                 return redirect(url_for('slot_manage', activity_id=activity.id))
 
             selected_date = datetime.strptime(date_str, '%Y-%m-%d')
+            if activity.end_date and selected_date.date() > activity.end_date:
+                flash(f'不能设置截止日期({activity.end_date})之后的时间')
+                return redirect(url_for('slot_manage', activity_id=activity.id))
+
             weekday_str = str(selected_date.weekday())
-            allowed_list = project.allowed_weekdays.split(',')
-            if weekday_str not in allowed_list:
+            if weekday_str not in project.allowed_weekdays.split(','):
                 flash('所选日期的星期不在允许放号范围内')
                 return redirect(url_for('slot_manage', activity_id=activity.id))
             
@@ -400,18 +439,19 @@ def slot_manage(activity_id):
             start_dt = datetime.strptime(f"{date_str} {t_start_str}", '%Y-%m-%d %H:%M')
             end_dt = datetime.strptime(f"{date_str} {t_end_str}", '%Y-%m-%d %H:%M')
 
+        if project.time_mode == 'manual':
+             if activity.end_date and start_dt.date() > activity.end_date:
+                flash(f'不能设置截止日期({activity.end_date})之后的时间')
+                return redirect(url_for('slot_manage', activity_id=activity.id))
+
         fields = project.dispatcher_fields.split(',')
         data = {}
         for f in fields:
-            if f.strip():
-                data[f.strip()] = request.form.get(f'field_{f.strip()}')
+            if f.strip(): data[f.strip()] = request.form.get(f'field_{f.strip()}')
         
         slot = Slot(
-            activity_id=activity.id,
-            dispatcher_id=current_user.id,
-            start_time=start_dt,
-            end_time=end_dt,
-            capacity=capacity,
+            activity_id=activity.id, dispatcher_id=current_user.id,
+            start_time=start_dt, end_time=end_dt, capacity=capacity,
             info_json=json.dumps(data)
         )
         db.session.add(slot)
@@ -436,20 +476,14 @@ def slot_manage(activity_id):
     if project.time_mode == 'class':
         sections = json.loads(project.class_sections_json) if project.class_sections_json else []
         for s in sections:
-            time_options.append({
-                'label': f"{s['name']} ({s['start']} - {s['end']})",
-                'value': f"{s['start']}|{s['end']}"
-            })
+            time_options.append({'label': f"{s['name']} ({s['start']} - {s['end']})", 'value': f"{s['start']}|{s['end']}"})
     elif project.time_mode == 'hourly':
         for h in range(24):
             s = f"{h:02d}:00"
             e = f"{h+1:02d}:00"
-            time_options.append({
-                'label': f"{s} - {e}",
-                'value': f"{s}|{e}"
-            })
+            time_options.append({'label': f"{s} - {e}", 'value': f"{s}|{e}"})
 
-    return render_template('slot_manage.html', activity=activity, slots=my_slots, fields=fields, time_options=time_options)
+    return render_template('slot_manage.html', activity=activity, slots=my_slots, fields=fields, time_options=time_options, config=config)
 
 @app.route('/dispatcher/delete_slot/<int:slot_id>')
 @login_required
@@ -483,10 +517,23 @@ def booking_list(code_str):
         return redirect(url_for('index'))
         
     slots = Slot.query.filter_by(activity_id=act.id).order_by(Slot.start_time).all()
+    
+    dispatcher_status = {}
+    involved_dispatchers = set([s.dispatcher_id for s in slots])
+    
+    for did in involved_dispatchers:
+        conf = DispatcherConfig.query.filter_by(activity_id=act.id, dispatcher_id=did).first()
+        total_bookings = Booking.query.join(Slot).filter(Slot.activity_id == act.id, Slot.dispatcher_id == did).count()
+        is_full = False
+        if conf and conf.enable_limit and total_bookings >= conf.max_quota:
+            is_full = True
+        dispatcher_status[did] = is_full
+
     valid_slots = []
     for s in slots:
         s.data = json.loads(s.info_json) if s.info_json else {}
         s.remain = s.capacity - s.current_count
+        s.dispatcher_full = dispatcher_status.get(s.dispatcher_id, False)
         valid_slots.append(s)
         
     return render_template('booking_list.html', activity=act, slots=valid_slots)
@@ -495,21 +542,70 @@ def booking_list(code_str):
 def booking_form(code_str, slot_id):
     slot = Slot.query.get_or_404(slot_id)
     act = slot.activity
+    
     if slot.current_count >= slot.capacity:
         flash('该时段已约满')
         return redirect(url_for('booking_list', code_str=code_str))
+    
+    conf = DispatcherConfig.query.filter_by(activity_id=act.id, dispatcher_id=slot.dispatcher_id).first()
+    if conf and conf.enable_limit:
+        total_bookings = Booking.query.join(Slot).filter(Slot.activity_id == act.id, Slot.dispatcher_id == slot.dispatcher_id).count()
+        if total_bookings >= conf.max_quota:
+             flash('该放号员接单已达上限，无法预约')
+             return redirect(url_for('booking_list', code_str=code_str))
+
     fields = [f.strip() for f in act.project.booker_fields.split(',') if f.strip()]
+
     if request.method == 'POST':
         data = {}
         for f in fields:
             data[f] = request.form.get(f'field_{f}')
-        booking = Booking(slot_id=slot.id, booker_json=json.dumps(data))
+            
+        b_code = generate_code(10)
+        
+        booking = Booking(
+            slot_id=slot.id, 
+            booker_json=json.dumps(data),
+            booking_code=b_code
+        )
         slot.current_count += 1
         db.session.add(booking)
         db.session.commit()
-        return render_template('success.html', code=code_str)
+        return render_template('success.html', code=code_str, booking_code=b_code)
+
     slot_info = json.loads(slot.info_json) if slot.info_json else {}
     return render_template('booking_form.html', slot=slot, slot_info=slot_info, fields=fields, activity=act)
+
+# --- 编辑/管理取号 ---
+
+@app.route('/manage_booking_entry', methods=['GET', 'POST'])
+def manage_booking_entry():
+    if request.method == 'POST':
+        b_code = request.form.get('booking_code')
+        booking = Booking.query.filter_by(booking_code=b_code).first()
+        if booking:
+            return redirect(url_for('manage_booking_view', b_code=b_code))
+        else:
+            flash('未找到该取号码')
+    return render_template('manage_booking_entry.html')
+
+@app.route('/manage_booking/view/<b_code>')
+def manage_booking_view(b_code):
+    booking = Booking.query.filter_by(booking_code=b_code).first_or_404()
+    booking.data = json.loads(booking.booker_json)
+    booking.slot.data = json.loads(booking.slot.info_json) if booking.slot.info_json else {}
+    return render_template('manage_booking_view.html', booking=booking)
+
+@app.route('/manage_booking/delete/<b_code>', methods=['POST'])
+def manage_booking_delete(b_code):
+    booking = Booking.query.filter_by(booking_code=b_code).first_or_404()
+    slot = booking.slot
+    slot.current_count -= 1
+    if slot.current_count < 0: slot.current_count = 0
+    db.session.delete(booking)
+    db.session.commit()
+    flash('取号已删除（取消预约）')
+    return redirect(url_for('index'))
 
 # --- 初始化 ---
 with app.app_context():

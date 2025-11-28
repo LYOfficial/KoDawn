@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="text-center mt-5">
+    <h2 class="mb-4">取号查询与管理</h2>
+    <div class="card p-4 mx-auto" style="max-width: 400px;">
+        <form method="POST">
+            <div class="mb-3">
+                <label class="form-label">请输入10位取号码</label>
+                <input type="text" name="booking_code" class="form-control form-control-lg text-center" required maxlength="10">
+            </div>
+            <button class="btn btn-primary w-100">查询</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

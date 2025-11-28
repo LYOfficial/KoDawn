@@ -27,11 +27,12 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
+                    <li class="nav-item"><a class="nav-link" href="/manage_booking_entry">✏️ 编辑/查询取号</a></li>
                     {% if current_user.is_authenticated %}
                         <li class="nav-item"><a class="nav-link" href="/profile">个人中心</a></li>
                         <li class="nav-item"><a class="nav-link text-danger" href="/logout">退出登录</a></li>
                     {% else %}
-                        <li class="nav-item"><a class="nav-link" href="/login">登录 (管理员/放号员)</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/login">登录</a></li>
                     {% endif %}
                 </ul>
             </div>

@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card mx-auto p-4 border-info" style="max-width: 500px;">
+    <h4 class="mb-3">我的预约信息</h4>
+    
+    <div class="alert alert-light border">
+        <strong>活动：</strong> {{ booking.slot.activity.name }}<br>
+        <strong>时间：</strong> {{ booking.slot.start_time.strftime('%Y-%m-%d %H:%M') }}<br>
+        <hr>
+        <strong>{{ booking.slot.activity.project.dispatcher_label }}信息：</strong><br>
+        {% for k, v in booking.slot.data.items() %}
+            {{ k }}: {{ v }}<br>
+        {% endfor %}
+    </div>
+
+    <div class="mb-4">
+        <h5 class="text-primary">我填写的信息：</h5>
+        <ul class="list-group">
+            {% for k, v in booking.data.items() %}
+            <li class="list-group-item d-flex justify-content-between">
+                <span>{{ k }}</span>
+                <strong>{{ v }}</strong>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <form action="{{ url_for('manage_booking_delete', b_code=booking.booking_code) }}" method="POST" onsubmit="return confirm('确定要删除这个预约吗？名额将释放给其他人。')">
+        <button class="btn btn-danger w-100">删除预约 (取消)</button>
+    </form>
+    <div class="text-center mt-3">
+        <a href="/" class="text-muted">返回首页</a>
+    </div>
+</div>
+{% endblock %}
