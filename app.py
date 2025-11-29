@@ -33,6 +33,11 @@ class User(UserMixin, db.Model):
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
 
+admin_projects = db.Table('admin_projects',
+    db.Column('user_id', db.Integer, db.ForeignKey('user.id'), primary_key=True),
+    db.Column('project_id', db.Integer, db.ForeignKey('project.id'), primary_key=True)
+)
+
 class Project(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     code = db.Column(db.String(6), unique=True, nullable=False)
@@ -48,6 +53,7 @@ class Project(db.Model):
     allow_edit = db.Column(db.Boolean, default=True)
     activities = db.relationship('Activity', backref='project', cascade="all, delete-orphan")
     dispatchers = db.relationship('User', backref='project', cascade="all, delete-orphan")
+    admins = db.relationship('User', secondary=admin_projects, backref=db.backref('managed_projects', lazy='dynamic'))
 
 dispatcher_groups = db.Table('dispatcher_groups',
     db.Column('user_id', db.Integer, db.ForeignKey('user.id'), primary_key=True),
@@ -277,8 +283,32 @@ def profile():
 @login_required
 def admin_dash():
     if current_user.role != 'admin': abort(403)
-    projects = Project.query.all()
+    # 只显示当前管理员管理的项目
+    projects = current_user.managed_projects.all()
     return render_template('admin_dash.html', projects=projects)
+
+@app.route('/admin/add_project_by_code', methods=['POST'])
+@login_required
+def add_project_by_code():
+    if current_user.role != 'admin': abort(403)
+    code = request.form.get('project_code')
+    if not code:
+        flash('请输入项目码')
+        return redirect(url_for('admin_dash'))
+    
+    project = Project.query.filter_by(code=code).first()
+    if not project:
+        flash('未找到该项目码对应的项目')
+        return redirect(url_for('admin_dash'))
+    
+    if project in current_user.managed_projects:
+        flash('你已经管理该项目了')
+    else:
+        current_user.managed_projects.append(project)
+        db.session.commit()
+        flash(f'成功添加项目：{project.name}')
+        
+    return redirect(url_for('admin_dash'))
 
 @app.route('/admin/create_project', methods=['POST'])
 @login_required
@@ -289,6 +319,8 @@ def create_project():
         code = generate_code(6)
         sections = get_default_sections()
         p = Project(name=name, code=code, class_sections_json=json.dumps(sections))
+        # 创建者自动成为管理员
+        current_user.managed_projects.append(p)
         db.session.add(p)
         db.session.commit()
         flash(f'项目创建成功，编号：{code}')
@@ -299,6 +331,10 @@ def create_project():
 def delete_project_direct(project_id):
     if current_user.role != 'admin': abort(403)
     project = Project.query.get_or_404(project_id)
+    # 权限检查
+    if project not in current_user.managed_projects:
+        abort(403)
+        
     db.session.delete(project)
     db.session.commit()
     flash('项目已删除')
@@ -309,6 +345,9 @@ def delete_project_direct(project_id):
 def project_edit(project_id):
     if current_user.role != 'admin': abort(403)
     project = Project.query.get_or_404(project_id)
+    # 权限检查
+    if project not in current_user.managed_projects:
+        abort(403)
     
     if request.method == 'POST':
         action = request.form.get('action')

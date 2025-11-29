@@ -1,18 +1,42 @@
 {% extends "base.html" %}
 {% block content %}
 <h4 class="mb-3">项目管理</h4>
-<button class="btn btn-success mb-3 w-100" type="button" data-bs-toggle="collapse" data-bs-target="#newProject">
-    + 新建项目
-</button>
+
+<div class="row mb-3">
+    <div class="col-6">
+        <button class="btn btn-success w-100" type="button" data-bs-toggle="collapse" data-bs-target="#newProject">
+            + 新建项目
+        </button>
+    </div>
+    <div class="col-6">
+        <button class="btn btn-outline-primary w-100" type="button" data-bs-toggle="collapse" data-bs-target="#addProject">
+            + 添加已有项目
+        </button>
+    </div>
+</div>
 
 <div class="collapse mb-3" id="newProject">
-    <div class="card p-3">
+    <div class="card p-3 border-success">
+        <h6 class="text-success">新建项目</h6>
         <form action="{{ url_for('create_project') }}" method="POST">
             <div class="mb-3">
                 <label>项目名称</label>
                 <input type="text" name="name" class="form-control" required>
             </div>
-            <button type="submit" class="btn btn-primary">创建</button>
+            <button type="submit" class="btn btn-success">创建</button>
+        </form>
+    </div>
+</div>
+
+<div class="collapse mb-3" id="addProject">
+    <div class="card p-3 border-primary">
+        <h6 class="text-primary">添加已有项目</h6>
+        <form action="{{ url_for('add_project_by_code') }}" method="POST">
+            <div class="mb-3">
+                <label>6位项目码</label>
+                <input type="text" name="project_code" class="form-control" placeholder="请输入项目码" required>
+            </div>
+            <button type="submit" class="btn btn-primary">添加并管理</button>
         </form>
     </div>
 </div>
@@ -30,6 +54,10 @@
             <a href="{{ url_for('project_edit', project_id=p.id) }}" class="btn btn-sm btn-outline-primary me-1">管理</a>
             <a href="{{ url_for('delete_project_direct', project_id=p.id) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('警告：确定要删除【{{ p.name }}】吗？这会清空该项目下所有数据！')">删除</a>
         </div>
+    </div>
+    {% else %}
+    <div class="text-center text-muted p-4">
+        你还没有管理任何项目，请新建或添加。
     </div>
     {% endfor %}
 </div>
