@@ -36,13 +36,17 @@ KoDawn者，可待也，乃集自助放号与取号之能，助君统筹预约�
 
 
 
-## 使用
+## 界面预览
 
-`项目管理员`使用教程：
+![01](https://oss.1n.hk/image/08af3985-64a0-4ec0-9de7-bf82ce447513/c7da8d469033f965.png)
 
-`放号员`使用教程：
+![02](https://oss.1n.hk/image/08af3985-64a0-4ec0-9de7-bf82ce447513/d71e6dc77b2b16b5.png)
 
-`取号员`使用教程：
+
+
+## 使用教程
+
+查看使用教程：[[PDF文档]](http://oss.1n.hk/lyofficial/files/KodawnWiki.pdf) [[在线文档]](https://www.kdocs.cn/l/ccmWMU45zoUT)
 
 
 
