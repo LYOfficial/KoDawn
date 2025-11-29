@@ -46,6 +46,10 @@ KoDawn者，可待也，乃集自助放号与取号之能，助君统筹预约�
 
 ## 使用教程
 
+> 教程更新时间：2025/11/29 17:01 
+>
+> 时间原因，最新更新内容可能不在使用教程中，请自行探索，感谢配合！
+
 查看使用教程：[[PDF文档]](http://oss.1n.hk/lyofficial/files/KodawnWiki.pdf) [[在线文档]](https://www.kdocs.cn/l/ccmWMU45zoUT)
 
 
