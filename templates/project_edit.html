@@ -119,11 +119,14 @@
         <input type="hidden" name="action" value="create_dispatcher">
         <div class="col-5"><input type="text" name="username" class="form-control" placeholder="用户名" required></div>
         <div class="col-5"><input type="text" name="password" class="form-control" placeholder="密码" required></div>
-        <div class="col-2"><button class="btn btn-primary w-100">加</button></div>
+        <div class="col-2"><button class="btn btn-primary w-100">+</button></div>
     </form>
     <ul class="list-group">
         {% for d in project.dispatchers %}
-        <li class="list-group-item">{{ d.username }}</li>
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+            {{ d.username }}
+            <a href="{{ url_for('delete_dispatcher', dispatcher_id=d.id) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('确定删除该放号员？')">删除</a>
+        </li>
         {% endfor %}
     </ul>
 </div>

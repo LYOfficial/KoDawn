@@ -351,6 +351,21 @@ def project_edit(project_id):
     allowed_wd = project.allowed_weekdays.split(',') if project.allowed_weekdays else []
     return render_template('project_edit.html', project=project, sections=sections, allowed_wd=allowed_wd)
 
+@app.route('/admin/delete_dispatcher/<int:dispatcher_id>')
+@login_required
+def delete_dispatcher(dispatcher_id):
+    if current_user.role != 'admin': abort(403)
+    user = User.query.get_or_404(dispatcher_id)
+    if user.role != 'dispatcher':
+        flash('只能删除放号员')
+        return redirect(url_for('admin_dash'))
+    
+    pid = user.project_id
+    db.session.delete(user)
+    db.session.commit()
+    flash('放号员已删除')
+    return redirect(url_for('project_edit', project_id=pid))
+
 @app.route('/admin/delete_activity/<int:activity_id>')
 @login_required
 def delete_activity(activity_id):
