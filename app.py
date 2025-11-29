@@ -7,7 +7,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, abo
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-from sqlalchemy import text # 用于执行原生SQL升级数据库
+from sqlalchemy import text
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'KoDawn-Secret-Key-Change-This'
@@ -101,7 +101,7 @@ class Slot(db.Model):
 class Booking(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     slot_id = db.Column(db.Integer, db.ForeignKey('slot.id'), nullable=False)
-    booking_code = db.Column(db.String(10), unique=True, nullable=True) # 升级时允许为空，之后填补
+    booking_code = db.Column(db.String(10), unique=True, nullable=True)
     booker_json = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.now)
 
@@ -133,19 +133,15 @@ def get_default_sections():
         {"name": "第六节", "start": "19:30", "end": "21:00"}
     ]
 
-# --- 核心：数据库无损升级指令 ---
+# --- 数据库升级指令 ---
 
 @app.cli.command("update-db")
 def update_db_schema():
-    """【重要】升级数据库结构，保留旧数据"""
     print("开始检查数据库结构...")
     
-    # 1. 尝试创建所有新定义的表（如果表不存在，会自动创建；如果存在，会跳过）
     db.create_all()
     print("√ 基础表结构检查完成")
 
-    # 2. 补全新增的字段 (SQLite 不支持直接检查字段是否存在，所以我们尝试添加，失败则忽略)
-    # 格式: (表名, 字段名, 类型, 默认值)
     migrations = [
         ('activity', 'end_date', 'DATE', 'NULL'),
         ('activity', 'start_time', 'DATETIME', 'NULL'),
@@ -161,15 +157,12 @@ def update_db_schema():
     with db.engine.connect() as conn:
         for table, col, col_type, default in migrations:
             try:
-                # 尝试添加列
                 conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {col_type} DEFAULT {default}"))
                 print(f"  + 已向 {table} 表添加新字段: {col}")
             except Exception as e:
-                # 如果报错，说明字段可能已经存在，或者表不存在，我们忽略错误
                 pass
         conn.commit()
 
-    # 3. 数据回填：为旧的预约记录生成取号码
     print("检查旧数据完整性...")
     bookings_without_code = Booking.query.filter(Booking.booking_code == None).all()
     if bookings_without_code:
@@ -658,7 +651,7 @@ def booking_list(code_str):
         not_started = True
     if act.end_time and now > act.end_time:
         ended = True
-    # 兼容旧逻辑：如果只有 end_date
+    
     if act.end_date and act.end_date < now.date():
         ended = True
 
@@ -685,14 +678,13 @@ def booking_list(code_str):
         s.remain = s.capacity - s.current_count
         s.dispatcher_full = dispatcher_status.get(s.dispatcher_id, False)
         
-        # 状态影响
         s.disabled = False
         if not_started or ended:
             s.disabled = True
         elif s.remain <= 0 or s.dispatcher_full:
             s.disabled = True
             
-        s.is_taken = (s.remain <= 0 or s.dispatcher_full) # 用于排序沉底
+        s.is_taken = (s.remain <= 0 or s.dispatcher_full)
         
         dispatcher = s.dispatcher
         if not dispatcher.groups:
