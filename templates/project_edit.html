@@ -14,9 +14,10 @@
         <input type="hidden" name="action" value="create_activity">
         <div class="input-group">
             <input type="text" name="name" class="form-control" placeholder="活动名称" required>
-            <div class="input-group-text bg-white border-end-0">截止日期</div>
-            <!-- 【修改】改为日期选择器 -->
-            <input type="date" name="end_date" class="form-control border-start-0" required>
+            <div class="input-group-text bg-white border-end-0">开始</div>
+            <input type="datetime-local" name="start_time" class="form-control border-start-0">
+            <div class="input-group-text bg-white border-end-0 border-start-0">截止</div>
+            <input type="datetime-local" name="end_time" class="form-control border-start-0">
             <button class="btn btn-success">新建</button>
         </div>
     </form>
@@ -25,7 +26,11 @@
         <div class="list-group-item d-flex justify-content-between align-items-center">
             <div>
                 <span class="fw-bold">{{ act.name }}</span> <span class="badge bg-secondary">{{ act.code }}</span>
-                <br><small class="text-muted">截止: {{ act.end_date }}</small>
+                <br>
+                <small class="text-muted">
+                    {% if act.start_time %}开始: {{ act.start_time.strftime('%Y-%m-%d %H:%M') }}{% endif %}
+                    {% if act.end_time %} | 截止: {{ act.end_time.strftime('%Y-%m-%d %H:%M') }}{% endif %}
+                </small>
             </div>
             <div>
                 <a href="{{ url_for('admin_activity_detail', activity_id=act.id) }}" class="btn btn-sm btn-info text-white me-2">数据</a>
@@ -112,20 +117,68 @@
     </form>
 </div>
 
-<!-- 人员管理 (保持不变) -->
+<!-- 小组管理 -->
+<div class="card p-3 mb-4">
+    <h5>小组管理</h5>
+    <form method="POST" class="mb-3">
+        <input type="hidden" name="action" value="create_group">
+        <div class="input-group">
+            <input type="text" name="group_name" class="form-control" placeholder="小组名称" required>
+            <button class="btn btn-success">新建小组</button>
+        </div>
+    </form>
+    <ul class="list-group">
+        {% for g in project.groups %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+            <form action="{{ url_for('rename_group', group_id=g.id) }}" method="POST" class="d-flex flex-grow-1 me-2">
+                <input type="text" name="name" class="form-control form-control-sm me-2" value="{{ g.name }}">
+                <button class="btn btn-sm btn-outline-secondary">重命名</button>
+            </form>
+            <a href="{{ url_for('delete_group', group_id=g.id) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('确定删除该小组？')">删除</a>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+
+<!-- 人员管理 -->
 <div class="card p-3">
     <h5>人员管理</h5>
-    <form method="POST" class="row g-2 mb-3">
+    <form method="POST" class="row g-2 mb-3 align-items-center">
         <input type="hidden" name="action" value="create_dispatcher">
-        <div class="col-5"><input type="text" name="username" class="form-control" placeholder="用户名" required></div>
-        <div class="col-5"><input type="text" name="password" class="form-control" placeholder="密码" required></div>
+        <div class="col-3"><input type="text" name="username" class="form-control" placeholder="用户名" required></div>
+        <div class="col-3"><input type="text" name="password" class="form-control" placeholder="密码" required></div>
+        <div class="col-4">
+             <div class="dropdown">
+                  <button class="btn btn-outline-secondary dropdown-toggle w-100" type="button" id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="false">
+                    选择小组
+                  </button>
+                  <ul class="dropdown-menu p-2" aria-labelledby="dropdownMenuButton1">
+                    {% for g in project.groups %}
+                    <li>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="groups" value="{{ g.id }}" id="g{{ g.id }}">
+                            <label class="form-check-label" for="g{{ g.id }}">{{ g.name }}</label>
+                        </div>
+                    </li>
+                    {% endfor %}
+                  </ul>
+            </div>
+        </div>
         <div class="col-2"><button class="btn btn-primary w-100">+</button></div>
     </form>
     <ul class="list-group">
         {% for d in project.dispatchers %}
         <li class="list-group-item d-flex justify-content-between align-items-center">
-            {{ d.username }}
-            <a href="{{ url_for('delete_dispatcher', dispatcher_id=d.id) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('确定删除该放号员？')">删除</a>
+            <div>
+                {{ d.username }}
+                <small class="text-muted">
+                    [{% for g in d.groups %}{{ g.name }}{% if not loop.last %}, {% endif %}{% endfor %}]
+                </small>
+            </div>
+            <div>
+                <a href="{{ url_for('edit_dispatcher', dispatcher_id=d.id) }}" class="btn btn-sm btn-outline-primary me-1">编辑</a>
+                <a href="{{ url_for('delete_dispatcher', dispatcher_id=d.id) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('确定删除该放号员？')">删除</a>
+            </div>
         </li>
         {% endfor %}
     </ul>

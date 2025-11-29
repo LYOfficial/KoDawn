@@ -3,43 +3,89 @@
 <div class="text-center mb-4">
     <h3>{{ activity.name }}</h3>
     <p class="text-muted">你好，{{ activity.project.booker_label }}，请选择时间</p>
+    
+    {% if not_started %}
+    <div class="alert alert-warning">
+        活动尚未开始，开始时间：{{ activity.start_time.strftime('%Y-%m-%d %H:%M') }}
+        <br>
+        <span id="countdown" class="fw-bold text-danger"></span>
+    </div>
+    {% elif ended %}
+    <div class="alert alert-secondary">
+        活动已结束
+    </div>
+    {% endif %}
 </div>
 
-<div class="row">
-    {% for s in slots %}
-    <div class="col-md-6">
-        <!-- 如果没有名额 OR 放号员已满限额，则变灰 -->
-        <div class="card p-3 slot-card {% if s.remain <= 0 or s.dispatcher_full %}slot-full{% else %}border-primary{% endif %}" 
-             {% if s.remain > 0 and not s.dispatcher_full %}onclick="location.href='{{ url_for('booking_form', code_str=activity.code, slot_id=s.id) }}'"{% endif %}>
-            
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h5 class="mb-0">{{ s.start_time.strftime('%Y-%m-%d') }}</h5>
-                    <div class="fw-bold text-primary">{{ s.start_time.strftime('%H:%M') }} - {{ s.end_time.strftime('%H:%M') }}</div>
+{% for group_info in grouped_slots %}
+<div class="mb-4">
+    <h4 class="border-bottom pb-2 mb-3">{{ group_info.name }}</h4>
+    <div class="row">
+        {% for s in group_info.slots %}
+        <div class="col-md-6">
+            <!-- 如果没有名额 OR 放号员已满限额 OR 活动未开始/已结束，则变灰 -->
+            <div class="card p-3 slot-card {% if s.disabled %}slot-full{% else %}border-primary{% endif %}" 
+                 {% if not s.disabled %}onclick="location.href='{{ url_for('booking_form', code_str=activity.code, slot_id=s.id) }}'"{% endif %}>
+                
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="mb-0">{{ s.start_time.strftime('%Y-%m-%d') }}</h5>
+                        <div class="fw-bold text-primary">{{ s.start_time.strftime('%H:%M') }} - {{ s.end_time.strftime('%H:%M') }}</div>
+                    </div>
+                    <div class="text-end">
+                        {% if not_started %}
+                             <span class="badge bg-warning text-dark">未开始</span>
+                        {% elif ended %}
+                             <span class="badge bg-secondary">已结束</span>
+                        {% elif s.dispatcher_full %}
+                             <span class="badge bg-secondary">放号员已满</span>
+                        {% elif s.remain > 0 %}
+                            <span class="badge bg-success">余 {{ s.remain }}</span>
+                        {% else %}
+                            <span class="badge bg-secondary">已抢光</span>
+                        {% endif %}
+                    </div>
                 </div>
-                <div class="text-end">
-                    {% if s.dispatcher_full %}
-                         <span class="badge bg-secondary">放号员已满</span>
-                    {% elif s.remain > 0 %}
-                        <span class="badge bg-success">余 {{ s.remain }}</span>
-                    {% else %}
-                        <span class="badge bg-secondary">已抢光</span>
-                    {% endif %}
+                
+                <div class="mt-2 text-muted small border-top pt-2">
+                    {{ activity.project.dispatcher_label }}:
+                    {% for k, v in s.data.items() %}
+                        <div><strong>{{ k }}:</strong> {{ v }}</div>
+                    {% endfor %}
                 </div>
-            </div>
-            
-            <div class="mt-2 text-muted small border-top pt-2">
-                {{ activity.project.dispatcher_label }}:
-                {% for k, v in s.data.items() %}
-                    <div><strong>{{ k }}:</strong> {{ v }}</div>
-                {% endfor %}
             </div>
         </div>
+        {% endfor %}
     </div>
-    {% else %}
-    <div class="text-center text-muted mt-5">
-        <p>暂无号源，请稍后再来。</p>
-    </div>
-    {% endfor %}
 </div>
+{% else %}
+<div class="text-center text-muted mt-5">
+    <p>暂无号源，请稍后再来。</p>
+</div>
+{% endfor %}
+
+{% if not_started and activity.start_time %}
+<script>
+function updateCountdown() {
+    var now = new Date().getTime();
+    var startTime = new Date("{{ activity.start_time.isoformat() }}").getTime();
+    var distance = startTime - now;
+
+    if (distance < 0) {
+        document.getElementById("countdown").innerHTML = "活动已开始，请刷新页面！";
+        return;
+    }
+
+    var days = Math.floor(distance / (1000 * 60 * 60 * 24));
+    var hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    var minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+    var seconds = Math.floor((distance % (1000 * 60)) / 1000);
+
+    document.getElementById("countdown").innerHTML = "倒计时: " + days + "天 " + hours + "时 " + minutes + "分 " + seconds + "秒 ";
+}
+setInterval(updateCountdown, 1000);
+updateCountdown();
+</script>
+{% endif %}
+
 {% endblock %}

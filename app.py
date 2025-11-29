@@ -49,12 +49,27 @@ class Project(db.Model):
     activities = db.relationship('Activity', backref='project', cascade="all, delete-orphan")
     dispatchers = db.relationship('User', backref='project', cascade="all, delete-orphan")
 
+dispatcher_groups = db.Table('dispatcher_groups',
+    db.Column('user_id', db.Integer, db.ForeignKey('user.id'), primary_key=True),
+    db.Column('group_id', db.Integer, db.ForeignKey('group.id'), primary_key=True)
+)
+
+class Group(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), nullable=False)
+    project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=False)
+    project = db.relationship('Project', backref=db.backref('groups', cascade="all, delete-orphan"))
+    dispatchers = db.relationship('User', secondary=dispatcher_groups, lazy='subquery',
+        backref=db.backref('groups', lazy=True))
+
 class Activity(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     code = db.Column(db.String(8), unique=True, nullable=False)
     name = db.Column(db.String(100), nullable=False)
     project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=False)
     end_date = db.Column(db.Date, nullable=True) 
+    start_time = db.Column(db.DateTime, nullable=True)
+    end_time = db.Column(db.DateTime, nullable=True)
     slots = db.relationship('Slot', backref='activity', cascade="all, delete-orphan")
     dispatcher_configs = db.relationship('DispatcherConfig', backref='activity', cascade="all, delete-orphan")
 
@@ -127,6 +142,8 @@ def update_db_schema():
     # 格式: (表名, 字段名, 类型, 默认值)
     migrations = [
         ('activity', 'end_date', 'DATE', 'NULL'),
+        ('activity', 'start_time', 'DATETIME', 'NULL'),
+        ('activity', 'end_time', 'DATETIME', 'NULL'),
         ('booking', 'booking_code', 'VARCHAR(10)', 'NULL'),
         ('project', 'time_mode', 'VARCHAR(20)', "'manual'"),
         ('project', 'class_sections_json', 'TEXT', "''"),
@@ -321,22 +338,38 @@ def project_edit(project_id):
         elif action == 'create_dispatcher':
             uname = request.form.get('username')
             pwd = request.form.get('password')
+            group_ids = request.form.getlist('groups')
             if User.query.filter_by(username=uname).first():
                 flash('用户名已存在')
             else:
                 u = User(username=uname, role='dispatcher', project_id=project.id)
                 u.set_password(pwd)
+                for gid in group_ids:
+                    grp = Group.query.get(int(gid))
+                    if grp and grp.project_id == project.id:
+                        u.groups.append(grp)
                 db.session.add(u)
                 db.session.commit()
                 flash('人员添加成功')
+
+        elif action == 'create_group':
+            gname = request.form.get('group_name')
+            if gname:
+                g = Group(name=gname, project_id=project.id)
+                db.session.add(g)
+                db.session.commit()
+                flash('小组创建成功')
         
         elif action == 'create_activity':
             aname = request.form.get('name')
             acode = generate_code(8)
-            end_date_str = request.form.get('end_date')
-            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date() if end_date_str else None
+            start_str = request.form.get('start_time')
+            end_str = request.form.get('end_time')
             
-            act = Activity(name=aname, code=acode, project_id=project.id, end_date=end_date)
+            start_dt = datetime.strptime(start_str, '%Y-%m-%dT%H:%M') if start_str else None
+            end_dt = datetime.strptime(end_str, '%Y-%m-%dT%H:%M') if end_str else None
+            
+            act = Activity(name=aname, code=acode, project_id=project.id, start_time=start_dt, end_time=end_dt)
             db.session.add(act)
             db.session.commit()
             flash(f'活动创建成功，编号：{acode}')
@@ -365,6 +398,55 @@ def delete_dispatcher(dispatcher_id):
     db.session.commit()
     flash('放号员已删除')
     return redirect(url_for('project_edit', project_id=pid))
+
+@app.route('/admin/delete_group/<int:group_id>')
+@login_required
+def delete_group(group_id):
+    if current_user.role != 'admin': abort(403)
+    grp = Group.query.get_or_404(group_id)
+    pid = grp.project_id
+    db.session.delete(grp)
+    db.session.commit()
+    flash('小组已删除')
+    return redirect(url_for('project_edit', project_id=pid))
+
+@app.route('/admin/rename_group/<int:group_id>', methods=['POST'])
+@login_required
+def rename_group(group_id):
+    if current_user.role != 'admin': abort(403)
+    grp = Group.query.get_or_404(group_id)
+    new_name = request.form.get('name')
+    if new_name:
+        grp.name = new_name
+        db.session.commit()
+        flash('小组重命名成功')
+    return redirect(url_for('project_edit', project_id=grp.project_id))
+
+@app.route('/admin/edit_dispatcher/<int:dispatcher_id>', methods=['GET', 'POST'])
+@login_required
+def edit_dispatcher(dispatcher_id):
+    if current_user.role != 'admin': abort(403)
+    user = User.query.get_or_404(dispatcher_id)
+    if user.role != 'dispatcher': abort(403)
+    
+    if request.method == 'POST':
+        new_pass = request.form.get('password')
+        if new_pass:
+            user.set_password(new_pass)
+            flash('密码已修改')
+        
+        group_ids = request.form.getlist('groups')
+        user.groups = [] 
+        for gid in group_ids:
+            grp = Group.query.get(int(gid))
+            if grp and grp.project_id == user.project_id:
+                user.groups.append(grp)
+        db.session.commit()
+        flash('放号员信息已更新')
+        return redirect(url_for('project_edit', project_id=user.project_id))
+
+    project = Project.query.get(user.project_id)
+    return render_template('dispatcher_edit.html', user=user, project=project)
 
 @app.route('/admin/delete_activity/<int:activity_id>')
 @login_required
@@ -527,10 +609,20 @@ def book_entry():
 @app.route('/book/<code_str>')
 def booking_list(code_str):
     act = Activity.query.filter_by(code=code_str).first_or_404()
-    if act.end_date and act.end_date < datetime.now().date():
-        flash('该活动已结束')
-        return redirect(url_for('index'))
-        
+    now = datetime.now()
+    
+    # 状态判断
+    not_started = False
+    ended = False
+    
+    if act.start_time and now < act.start_time:
+        not_started = True
+    if act.end_time and now > act.end_time:
+        ended = True
+    # 兼容旧逻辑：如果只有 end_date
+    if act.end_date and act.end_date < now.date():
+        ended = True
+
     slots = Slot.query.filter_by(activity_id=act.id).order_by(Slot.start_time).all()
     
     dispatcher_status = {}
@@ -544,19 +636,67 @@ def booking_list(code_str):
             is_full = True
         dispatcher_status[did] = is_full
 
-    valid_slots = []
+    project_groups = act.project.groups
+    group_map = {g.id: g for g in project_groups}
+    slots_by_group = {g_id: [] for g_id in group_map.keys()}
+    slots_ungrouped = []
+
     for s in slots:
         s.data = json.loads(s.info_json) if s.info_json else {}
         s.remain = s.capacity - s.current_count
         s.dispatcher_full = dispatcher_status.get(s.dispatcher_id, False)
-        valid_slots.append(s)
         
-    return render_template('booking_list.html', activity=act, slots=valid_slots)
+        # 状态影响
+        s.disabled = False
+        if not_started or ended:
+            s.disabled = True
+        elif s.remain <= 0 or s.dispatcher_full:
+            s.disabled = True
+            
+        s.is_taken = (s.remain <= 0 or s.dispatcher_full) # 用于排序沉底
+        
+        dispatcher = s.dispatcher
+        if not dispatcher.groups:
+            slots_ungrouped.append(s)
+        else:
+            for g in dispatcher.groups:
+                if g.id in slots_by_group:
+                    slots_by_group[g.id].append(s)
+    
+    def sort_slots(slot_list):
+        return sorted(slot_list, key=lambda x: x.is_taken)
+        
+    final_groups = []
+    for g in project_groups:
+        if slots_by_group[g.id]:
+            final_groups.append({
+                'name': g.name,
+                'slots': sort_slots(slots_by_group[g.id])
+            })
+            
+    if slots_ungrouped:
+        final_groups.append({
+            'name': '其他',
+            'slots': sort_slots(slots_ungrouped)
+        })
+        
+    return render_template('booking_list.html', activity=act, grouped_slots=final_groups, not_started=not_started, ended=ended, now=now)
 
 @app.route('/book/<code_str>/slot/<int:slot_id>', methods=['GET', 'POST'])
 def booking_form(code_str, slot_id):
     slot = Slot.query.get_or_404(slot_id)
     act = slot.activity
+    now = datetime.now()
+    
+    if act.start_time and now < act.start_time:
+        flash('活动尚未开始')
+        return redirect(url_for('booking_list', code_str=code_str))
+    if act.end_time and now > act.end_time:
+        flash('活动已结束')
+        return redirect(url_for('booking_list', code_str=code_str))
+    if act.end_date and act.end_date < now.date():
+        flash('活动已结束')
+        return redirect(url_for('booking_list', code_str=code_str))
     
     if slot.current_count >= slot.capacity:
         flash('该时段已约满')
