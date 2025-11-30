@@ -14,6 +14,13 @@
 
 KoDawn者，可待也，乃集自助放号与取号之能，助君统筹预约事务，无论活动报名、诊室排班，抑或资源分配，皆可井井有条。
 
+## 在线体验
+
+在线体验地址：https://kodawn.cn/
+
+在线部署赞助方：<a href="https://jianyuelab.org/" target="_blank"><img src="https://oss.1n.hk/image/jl/logo.png" alt="JIANYUELA" height="40"/></a>
+
+
 ## 功能说明
 
 **可待**是一款基于 Python Flask 的**自主放号取号系统**，灵感来源于**医院叫号系统**，为了解决其他行业同样的放号及取号需求。**可待**同时具备前后端和数据库，是自主搭建的轻量化首选叫号系统平台，分权限管理，方便易用。
