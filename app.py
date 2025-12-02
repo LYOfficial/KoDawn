@@ -3,6 +3,10 @@ import random
 import json
 import string
 from datetime import datetime, timedelta
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:  # Python < 3.9 fallback
+    ZoneInfo = None
 from flask import Flask, render_template, request, redirect, url_for, flash, abort
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
@@ -17,6 +21,33 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
+
+# --- 时区辅助 ---
+APP_TIMEZONE = os.getenv('APP_TIMEZONE', 'Asia/Shanghai')
+APP_TIMEZONE_OFFSET = os.getenv('APP_TIMEZONE_OFFSET', None)
+
+def _resolve_timezone():
+    if not ZoneInfo:
+        return None
+    try:
+        return ZoneInfo(APP_TIMEZONE)
+    except Exception:
+        return None
+
+LOCAL_TZ = _resolve_timezone()
+
+def get_local_now():
+    """Return naive datetime aligned with configured timezone for consistent comparisons."""
+    if LOCAL_TZ:
+        # Drop tzinfo so it compares with existing naive timestamps in DB.
+        return datetime.now(LOCAL_TZ).replace(tzinfo=None)
+    if APP_TIMEZONE_OFFSET:
+        try:
+            offset_hours = float(APP_TIMEZONE_OFFSET)
+            return datetime.utcnow() + timedelta(hours=offset_hours)
+        except ValueError:
+            pass
+    return datetime.now()
 
 # --- 数据库模型 ---
 
@@ -641,7 +672,7 @@ def book_entry():
 @app.route('/book/<code_str>')
 def booking_list(code_str):
     act = Activity.query.filter_by(code=code_str).first_or_404()
-    now = datetime.now()
+    now = get_local_now()
     
     # 状态判断
     not_started = False
@@ -717,7 +748,7 @@ def booking_list(code_str):
 def booking_form(code_str, slot_id):
     slot = Slot.query.get_or_404(slot_id)
     act = slot.activity
-    now = datetime.now()
+    now = get_local_now()
     
     if act.start_time and now < act.start_time:
         flash('活动尚未开始')
