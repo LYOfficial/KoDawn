@@ -1,0 +1,37 @@
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="/admin">首页</a></li>
+    <li class="breadcrumb-item"><a href="/admin/project/<%= project.id %>"><%= project.name %></a></li>
+    <li class="breadcrumb-item active">编辑放号员: <%= user.username %></li>
+  </ol>
+</nav>
+
+<div class="card p-4">
+    <h4 class="mb-3">编辑放号员: <%= user.username %></h4>
+    <form method="POST">
+        <div class="mb-3">
+            <label class="form-label">修改密码 (留空则不修改)</label>
+            <input type="text" name="password" class="form-control" placeholder="新密码">
+        </div>
+        
+        <div class="mb-3">
+            <label class="form-label">所属小组</label>
+            <div class="card p-3">
+                <% if (project.groups && project.groups.length > 0) { %>
+                    <% project.groups.forEach(function(g) { %>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="groups" value="<%= g.id %>" id="g<%= g.id %>"
+                            <%= (user.userGroups && user.userGroups.some(ug => ug.id === g.id)) ? 'checked' : '' %>>
+                        <label class="form-check-label" for="g<%= g.id %>">
+                            <%= g.name %>
+                        </label>
+                    </div>
+                    <% }); %>
+                <% } %>
+            </div>
+        </div>
+        
+        <button type="submit" class="btn btn-primary">保存修改</button>
+        <a href="/admin/project/<%= project.id %>" class="btn btn-secondary">返回</a>
+    </form>
+</div>

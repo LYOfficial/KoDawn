@@ -1,4 +1,4 @@
-![Kodawn](https://socialify.git.ci/LYOfficial/Kodawn/image?custom_language=Python&description=1&font=KoHo&forks=1&issues=1&language=1&logo=https%3A%2F%2Foss.1n.hk%2Flyofficial%2Fimages%2Fkodawn.png&name=1&owner=1&pattern=Plus&pulls=1&stargazers=1&theme=Auto)
+![Kodawn](https://socialify.git.ci/LYOfficial/Kodawn/image?custom_language=Node.js&description=1&font=KoHo&forks=1&issues=1&language=1&logo=https%3A%2F%2Foss.1n.hk%2Flyofficial%2Fimages%2Fkodawn.png&name=1&owner=1&pattern=Plus&pulls=1&stargazers=1&theme=Auto)
 
 # KoDawn
 
@@ -8,7 +8,7 @@
 
 阁下若对此项目**有所青睐**，还请**移步右上**，点亮那颗**星标**，不胜感谢。
 
-![Python Badge](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white) ![Flask Badge](https://img.shields.io/badge/Flask-000000?style=for-the-badge&logo=flask&logoColor=white) ![SQLite Badge](https://img.shields.io/badge/SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
+![Node.js Badge](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=node.js&logoColor=white) ![Express Badge](https://img.shields.io/badge/Express-000000?style=for-the-badge&logo=express&logoColor=white) ![SQLite Badge](https://img.shields.io/badge/SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
 
 **万物有序，可待黎明。**
 
