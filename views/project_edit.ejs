@@ -1,0 +1,218 @@
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="/admin">首页</a></li>
+    <li class="breadcrumb-item active"><%= project.name %></li>
+  </ol>
+</nav>
+
+<!-- 活动列表区域 -->
+<div class="card p-3 mb-4">
+    <h5>活动列表</h5>
+    <form method="POST" class="mb-3">
+        <input type="hidden" name="action" value="create_activity">
+        <div class="input-group">
+            <input type="text" name="name" class="form-control" placeholder="活动名称" required>
+            <div class="input-group-text bg-white border-end-0">开始</div>
+            <input type="datetime-local" name="start_time" class="form-control border-start-0">
+            <div class="input-group-text bg-white border-end-0 border-start-0">截止</div>
+            <input type="datetime-local" name="end_time" class="form-control border-start-0">
+            <button class="btn btn-success">新建</button>
+        </div>
+    </form>
+    <div class="list-group">
+        <% if (project.activities && project.activities.length > 0) { %>
+            <% project.activities.forEach(function(act) { %>
+            <div class="list-group-item d-flex justify-content-between align-items-center">
+                <div>
+                    <span class="fw-bold"><%= act.name %></span> <span class="badge bg-secondary"><%= act.code %></span>
+                    <br>
+                    <small class="text-muted">
+                        <% if (act.start_time) { %>开始: <%= formatDateTime(act.start_time) %><% } %>
+                        <% if (act.end_time) { %> | 截止: <%= formatDateTime(act.end_time) %><% } %>
+                    </small>
+                </div>
+                <div>
+                    <a href="/admin/activity/<%= act.id %>" class="btn btn-sm btn-info text-white me-2">数据</a>
+                    <a href="/admin/delete_activity/<%= act.id %>" class="btn btn-sm btn-outline-danger" onclick="return confirm('确定删除？')">删除</a>
+                </div>
+            </div>
+            <% }); %>
+        <% } %>
+    </div>
+</div>
+
+<!-- 核心配置区域 -->
+<div class="card p-3 border-warning mb-4">
+    <h5 class="text-warning">项目核心配置</h5>
+    <form method="POST">
+        <input type="hidden" name="action" value="update_config">
+        
+        <div class="row mb-3">
+            <div class="col-6">
+                <label class="form-label fw-bold">1. 放号方称谓</label>
+                <input type="text" name="dispatcher_label" class="form-control" value="<%= project.dispatcher_label %>">
+            </div>
+            <div class="col-6">
+                <label class="form-label fw-bold">2. 取号方称谓</label>
+                <input type="text" name="booker_label" class="form-control" value="<%= project.booker_label %>">
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label fw-bold">3. 放号需填字段</label>
+            <input type="text" name="dispatcher_fields" class="form-control" value="<%= project.dispatcher_fields %>">
+        </div>
+        <div class="mb-3">
+            <label class="form-label fw-bold">4. 取号需填字段</label>
+            <input type="text" name="booker_fields" class="form-control" value="<%= project.booker_fields %>">
+        </div>
+        <div class="mb-3">
+            <label class="form-label fw-bold text-danger">5. 放号方可见隐私字段</label>
+            <input type="text" name="dispatcher_visible_fields" class="form-control" value="<%= project.dispatcher_visible_fields %>">
+        </div>
+
+        <hr>
+
+        <h6 class="text-primary fw-bold">时间选择模式</h6>
+        <div class="mb-3">
+            <select class="form-select" name="time_mode" id="timeModeSelect" onchange="toggleTimeConfig()">
+                <option value="manual" <%= project.time_mode === 'manual' ? 'selected' : '' %>>1. 手动选择 (精确日期时间)</option>
+                <option value="class" <%= project.time_mode === 'class' ? 'selected' : '' %>>2. 周课节选择 (学校/排班)</option>
+                <option value="hourly" <%= project.time_mode === 'hourly' ? 'selected' : '' %>>3. 按小时选择 (00:00-24:00)</option>
+            </select>
+        </div>
+
+        <div id="weekdayConfig" class="mb-3" style="display:none;">
+            <label class="form-label fw-bold">本周开放哪些天放号？</label><br>
+            <div class="btn-group" role="group">
+                <% var days = ['周一','周二','周三','周四','周五','周六','周日']; %>
+                <% for (var i = 0; i < 7; i++) { %>
+                <input type="checkbox" class="btn-check" name="allowed_weekdays" id="wd<%= i %>" value="<%= i %>" <%= allowed_wd.includes(String(i)) ? 'checked' : '' %>>
+                <label class="btn btn-outline-primary" for="wd<%= i %>"><%= days[i] %></label>
+                <% } %>
+            </div>
+        </div>
+
+        <div id="sectionConfig" class="mb-3" style="display:none;">
+            <label class="form-label fw-bold">课节设置</label>
+            <div id="sectionContainer">
+                <% sections.forEach(function(sec) { %>
+                <div class="input-group mb-2 sec-row">
+                    <input type="text" name="sec_name[]" class="form-control" placeholder="名称" value="<%= sec.name %>">
+                    <input type="time" name="sec_start[]" class="form-control" value="<%= sec.start %>">
+                    <span class="input-group-text">-</span>
+                    <input type="time" name="sec_end[]" class="form-control" value="<%= sec.end %>">
+                    <button type="button" class="btn btn-outline-danger" onclick="removeRow(this)">X</button>
+                </div>
+                <% }); %>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-success" onclick="addSection()">+ 增加一节</button>
+        </div>
+
+        <div class="form-check mb-3 mt-3">
+            <input class="form-check-input" type="checkbox" name="allow_edit" id="allowEdit" <%= project.allow_edit ? 'checked' : '' %>>
+            <label class="form-check-label" for="allowEdit">允许修改/删除</label>
+        </div>
+        <button class="btn btn-warning w-100">保存所有配置</button>
+    </form>
+</div>
+
+<!-- 小组管理 -->
+<div class="card p-3 mb-4">
+    <h5>小组管理</h5>
+    <form method="POST" class="mb-3">
+        <input type="hidden" name="action" value="create_group">
+        <div class="input-group">
+            <input type="text" name="group_name" class="form-control" placeholder="小组名称" required>
+            <button class="btn btn-success">新建小组</button>
+        </div>
+    </form>
+    <ul class="list-group">
+        <% if (project.groups && project.groups.length > 0) { %>
+            <% project.groups.forEach(function(g) { %>
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                <form action="/admin/rename_group/<%= g.id %>" method="POST" class="d-flex flex-grow-1 me-2">
+                    <input type="text" name="name" class="form-control form-control-sm me-2" value="<%= g.name %>">
+                    <button class="btn btn-sm btn-outline-secondary">重命名</button>
+                </form>
+                <a href="/admin/delete_group/<%= g.id %>" class="btn btn-sm btn-outline-danger" onclick="return confirm('确定删除该小组？')">删除</a>
+            </li>
+            <% }); %>
+        <% } %>
+    </ul>
+</div>
+
+<!-- 人员管理 -->
+<div class="card p-3">
+    <h5>人员管理</h5>
+    <form method="POST" class="row g-2 mb-3 align-items-center">
+        <input type="hidden" name="action" value="create_dispatcher">
+        <div class="col-3"><input type="text" name="username" class="form-control" placeholder="用户名" required></div>
+        <div class="col-3"><input type="text" name="password" class="form-control" placeholder="密码" required></div>
+        <div class="col-4">
+             <div class="dropdown">
+                  <button class="btn btn-outline-secondary dropdown-toggle w-100" type="button" id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="false">
+                    选择小组
+                  </button>
+                  <ul class="dropdown-menu p-2" aria-labelledby="dropdownMenuButton1">
+                    <% if (project.groups && project.groups.length > 0) { %>
+                        <% project.groups.forEach(function(g) { %>
+                        <li>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="groups" value="<%= g.id %>" id="g<%= g.id %>">
+                                <label class="form-check-label" for="g<%= g.id %>"><%= g.name %></label>
+                            </div>
+                        </li>
+                        <% }); %>
+                    <% } %>
+                  </ul>
+            </div>
+        </div>
+        <div class="col-2"><button class="btn btn-primary w-100">+</button></div>
+    </form>
+    <ul class="list-group">
+        <% if (project.dispatchers && project.dispatchers.length > 0) { %>
+            <% project.dispatchers.forEach(function(d) { %>
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                <div>
+                    <%= d.username %>
+                    <small class="text-muted">
+                        [<% if (d.userGroups && d.userGroups.length > 0) { %><%= d.userGroups.map(g => g.name).join(', ') %><% } %>]
+                    </small>
+                </div>
+                <div>
+                    <a href="/admin/edit_dispatcher/<%= d.id %>" class="btn btn-sm btn-outline-primary me-1">编辑</a>
+                    <a href="/admin/delete_dispatcher/<%= d.id %>" class="btn btn-sm btn-outline-danger" onclick="return confirm('确定删除该放号员？')">删除</a>
+                </div>
+            </li>
+            <% }); %>
+        <% } %>
+    </ul>
+</div>
+
+<script>
+function toggleTimeConfig() {
+    var mode = document.getElementById('timeModeSelect').value;
+    var wd = document.getElementById('weekdayConfig');
+    var sec = document.getElementById('sectionConfig');
+    
+    if (mode === 'manual') {
+        wd.style.display = 'none';
+        sec.style.display = 'none';
+    } else if (mode === 'hourly') {
+        wd.style.display = 'block';
+        sec.style.display = 'none';
+    } else if (mode === 'class') {
+        wd.style.display = 'block';
+        sec.style.display = 'block';
+    }
+}
+toggleTimeConfig();
+function addSection() {
+    var div = document.createElement('div');
+    div.className = 'input-group mb-2 sec-row';
+    div.innerHTML = '<input type="text" name="sec_name[]" class="form-control" placeholder="名称"><input type="time" name="sec_start[]" class="form-control"><span class="input-group-text">-</span><input type="time" name="sec_end[]" class="form-control"><button type="button" class="btn btn-outline-danger" onclick="removeRow(this)">X</button>';
+    document.getElementById('sectionContainer').appendChild(div);
+}
+function removeRow(btn) { btn.parentElement.remove(); }
+</script>
