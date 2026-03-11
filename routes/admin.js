@@ -188,13 +188,13 @@ router.post('/project/:project_id', ensureAdmin, async (req, res) => {
                 time_mode: req.body.time_mode
             };
             
-            // 处理允许的星期
+            // 处理允许的星期，避免表单未提交时覆盖为"空"
             const weekdays = req.body.allowed_weekdays;
             if (Array.isArray(weekdays)) {
                 updateData.allowed_weekdays = weekdays.join(',');
-            } else if (weekdays) {
+            } else if (typeof weekdays === 'string' && weekdays) {
                 updateData.allowed_weekdays = weekdays;
-            } else {
+            } else if (typeof weekdays !== 'undefined') {
                 updateData.allowed_weekdays = '';
             }
             
@@ -218,7 +218,13 @@ router.post('/project/:project_id', ensureAdmin, async (req, res) => {
                         });
                     }
                 }
-                updateData.class_sections_json = JSON.stringify(newSections);
+                if (newSections.length > 0) {
+                    updateData.class_sections_json = JSON.stringify(newSections);
+                } else if (project.class_sections_json) {
+                    updateData.class_sections_json = project.class_sections_json;
+                } else {
+                    updateData.class_sections_json = JSON.stringify(getDefaultSections());
+                }
             }
             
             await Project.update(updateData, { where: { id: project_id } });
