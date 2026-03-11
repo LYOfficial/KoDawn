@@ -1,0 +1,15 @@
+version: "3.9"
+
+services:
+  kodawn:
+    build: .
+    ports:
+      - "5000:5000"
+    env_file:
+      - .env
+    volumes:
+      - kodawn-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  kodawn-data:
