@@ -1,3 +1,162 @@
+<% if (typeof is_superadmin !== 'undefined' && is_superadmin) { %>
+<h4 class="mb-3">超级管理员中心</h4>
+
+<div class="card p-3 mb-4 border-danger">
+    <h6 class="text-danger">创建项目管理员</h6>
+    <form action="/admin/create_admin" method="POST" class="row g-2 align-items-center">
+        <div class="col-4">
+            <input type="text" name="username" class="form-control" placeholder="用户名" required>
+        </div>
+        <div class="col-4">
+            <input type="text" name="password" class="form-control" placeholder="密码" required>
+        </div>
+        <div class="col-4">
+            <button type="submit" class="btn btn-danger w-100">创建管理员</button>
+        </div>
+    </form>
+</div>
+
+<div class="card p-3 mb-4 border-secondary">
+    <h6 class="text-secondary">管理员绑定项目</h6>
+    <form action="/admin/assign_admin_project" method="POST" class="row g-2 align-items-center">
+        <div class="col-4">
+            <select name="admin_id" class="form-select" required>
+                <option value="">选择管理员</option>
+                <% if (admins && admins.length > 0) { %>
+                    <% admins.forEach(function(a) { %>
+                        <option value="<%= a.id %>"><%= a.username %></option>
+                    <% }); %>
+                <% } %>
+            </select>
+        </div>
+        <div class="col-4">
+            <select name="project_id" class="form-select" required>
+                <option value="">选择项目</option>
+                <% if (projects && projects.length > 0) { %>
+                    <% projects.forEach(function(p) { %>
+                        <option value="<%= p.id %>"><%= p.name %></option>
+                    <% }); %>
+                <% } %>
+            </select>
+        </div>
+        <div class="col-4">
+            <button type="submit" class="btn btn-secondary w-100">绑定</button>
+        </div>
+    </form>
+</div>
+
+<div class="card p-3 mb-4 border-primary">
+    <h6 class="text-primary">创建放号员</h6>
+    <form action="/admin/create_dispatcher_global" method="POST" class="row g-2 align-items-center">
+        <div class="col-3">
+            <input type="text" name="username" class="form-control" placeholder="用户名" required>
+        </div>
+        <div class="col-3">
+            <input type="text" name="password" class="form-control" placeholder="密码" required>
+        </div>
+        <div class="col-4">
+            <select name="project_id" class="form-select" required>
+                <option value="">选择项目</option>
+                <% if (projects && projects.length > 0) { %>
+                    <% projects.forEach(function(p) { %>
+                        <option value="<%= p.id %>"><%= p.name %></option>
+                    <% }); %>
+                <% } %>
+            </select>
+        </div>
+        <div class="col-2">
+            <button type="submit" class="btn btn-primary w-100">创建</button>
+        </div>
+    </form>
+</div>
+
+<div class="card p-3 mb-4 border-warning">
+    <h6 class="text-warning">数据库维护</h6>
+    <form action="/admin/update_db" method="POST" onsubmit="return confirm('确定要执行数据库升级吗？');">
+        <button type="submit" class="btn btn-warning">执行数据库升级</button>
+    </form>
+</div>
+
+<div class="card p-3 mb-4">
+    <h6 class="text-primary">用户列表</h6>
+    <div class="table-responsive">
+        <table class="table table-sm align-middle">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>用户名</th>
+                    <th>角色</th>
+                    <th>项目</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% if (users && users.length > 0) { %>
+                    <% users.forEach(function(u) { %>
+                    <tr>
+                        <td><%= u.id %></td>
+                        <td><%= u.username %></td>
+                        <td>
+                            <% if (u.role === 'superadmin') { %>
+                                超级管理员
+                            <% } else if (u.role === 'admin') { %>
+                                项目管理员
+                            <% } else { %>
+                                放号员
+                            <% } %>
+                        </td>
+                        <td><%= u.project ? u.project.name : '-' %></td>
+                        <td>
+                            <form action="/admin/update_user" method="POST" class="row g-1 align-items-center mb-1">
+                                <input type="hidden" name="user_id" value="<%= u.id %>">
+                                <div class="col-4">
+                                    <select name="role" class="form-select form-select-sm">
+                                        <option value="superadmin" <%= u.role === 'superadmin' ? 'selected' : '' %>>超级管理员</option>
+                                        <option value="admin" <%= u.role === 'admin' ? 'selected' : '' %>>项目管理员</option>
+                                        <option value="dispatcher" <%= u.role === 'dispatcher' ? 'selected' : '' %>>放号员</option>
+                                    </select>
+                                </div>
+                                <div class="col-4">
+                                    <select name="project_id" class="form-select form-select-sm">
+                                        <option value="">项目(放号员)</option>
+                                        <% if (projects && projects.length > 0) { %>
+                                            <% projects.forEach(function(p) { %>
+                                                <option value="<%= p.id %>" <%= (u.project && u.project.id === p.id) ? 'selected' : '' %>><%= p.name %></option>
+                                            <% }); %>
+                                        <% } %>
+                                    </select>
+                                </div>
+                                <div class="col-4">
+                                    <button type="submit" class="btn btn-sm btn-outline-primary w-100">更新</button>
+                                </div>
+                            </form>
+                            <form action="/admin/reset_user_password" method="POST" class="row g-1 align-items-center mb-1">
+                                <input type="hidden" name="user_id" value="<%= u.id %>">
+                                <div class="col-8">
+                                    <input type="text" name="new_password" class="form-control form-control-sm" placeholder="重置密码">
+                                </div>
+                                <div class="col-4">
+                                    <button type="submit" class="btn btn-sm btn-outline-warning w-100">重置</button>
+                                </div>
+                            </form>
+                            <form action="/admin/delete_user" method="POST" onsubmit="return confirm('确定要删除该用户吗？');">
+                                <input type="hidden" name="user_id" value="<%= u.id %>">
+                                <button type="submit" class="btn btn-sm btn-outline-danger w-100">删除用户</button>
+                            </form>
+                        </td>
+                    </tr>
+                    <% }); %>
+                <% } else { %>
+                    <tr>
+                        <td colspan="5" class="text-muted">暂无用户</td>
+                    </tr>
+                <% } %>
+            </tbody>
+        </table>
+    </div>
+</div>
+<% } %>
+
 <h4 class="mb-3">项目管理</h4>
 
 <div class="row mb-3">

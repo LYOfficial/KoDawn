@@ -6,8 +6,72 @@ const { ensureAuthenticated } = require('../middleware/auth');
 const { User } = require('../models');
 
 // 登录页面
-router.get('/login', (req, res) => {
-    res.render('login', { is_profile: false });
+router.get('/login', async (req, res) => {
+    try {
+        const userCount = await User.count();
+        if (userCount === 0) {
+            return res.redirect('/register');
+        }
+        res.render('login', { is_profile: false });
+    } catch (error) {
+        console.error(error);
+        res.render('login', { is_profile: false });
+    }
+});
+
+// 注册页面（仅首次）
+router.get('/register', async (req, res) => {
+    try {
+        const userCount = await User.count();
+        if (userCount > 0) {
+            return res.redirect('/login');
+        }
+        res.render('register');
+    } catch (error) {
+        console.error(error);
+        res.redirect('/login');
+    }
+});
+
+// 注册处理（仅首次创建超级管理员）
+router.post('/register', async (req, res) => {
+    const { username, password, confirm_password } = req.body;
+    try {
+        const userCount = await User.count();
+        if (userCount > 0) {
+            return res.status(403).render('error', { message: '注册已关闭' });
+        }
+        if (!username || !password) {
+            req.flash('info', '用户名和密码不能为空');
+            return res.redirect('/register');
+        }
+        if (password !== confirm_password) {
+            req.flash('info', '两次密码不一致');
+            return res.redirect('/register');
+        }
+
+        const existing = await User.findOne({ where: { username } });
+        if (existing) {
+            req.flash('info', '用户名已存在');
+            return res.redirect('/register');
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        const hash = await bcrypt.hash(password, salt);
+
+        await User.create({
+            username,
+            password_hash: hash,
+            role: 'superadmin'
+        });
+
+        req.flash('info', '超级管理员创建成功，请登录');
+        res.redirect('/login');
+    } catch (error) {
+        console.error(error);
+        req.flash('info', '注册失败');
+        res.redirect('/register');
+    }
 });
 
 // 登录处理

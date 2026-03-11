@@ -7,6 +7,10 @@ const { getLocalNow, formatDateTime } = require('../utils/helpers');
 // 放号员仪表盘
 router.get('/', ensureDispatcher, async (req, res) => {
     try {
+        if (req.user.role === 'superadmin') {
+            req.flash('info', '超级管理员请在管理中心操作');
+            return res.redirect('/admin');
+        }
         const project = await Project.findByPk(req.user.project_id, {
             include: [{ model: Activity, as: 'activities' }]
         });
@@ -32,7 +36,7 @@ router.get('/manage/:activity_id', ensureDispatcher, async (req, res) => {
             return res.status(404).render('error', { message: '活动不存在' });
         }
         
-        if (activity.project.id !== req.user.project_id) {
+        if (req.user.role !== 'superadmin' && activity.project.id !== req.user.project_id) {
             return res.status(403).render('error', { message: '没有权限' });
         }
         
@@ -131,7 +135,7 @@ router.post('/manage/:activity_id', ensureDispatcher, async (req, res) => {
             include: [{ model: Project, as: 'project' }]
         });
         
-        if (!activity || activity.project.id !== req.user.project_id) {
+        if (!activity || (req.user.role !== 'superadmin' && activity.project.id !== req.user.project_id)) {
             return res.status(403).render('error', { message: '没有权限' });
         }
         
@@ -227,7 +231,7 @@ router.get('/delete_slot/:slot_id', ensureDispatcher, async (req, res) => {
             include: [{ model: Activity, as: 'activity', include: [{ model: Project, as: 'project' }] }]
         });
         
-        if (!slot || slot.dispatcher_id !== req.user.id) {
+        if (!slot || (req.user.role !== 'superadmin' && slot.dispatcher_id !== req.user.id)) {
             return res.status(403).render('error', { message: '没有权限' });
         }
         

@@ -1,19 +1,283 @@
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
-const { ensureAdmin } = require('../middleware/auth');
-const { User, Project, Group, Activity, Slot, Booking, DispatcherConfig, AdminProjects, DispatcherGroups } = require('../models');
+const { ensureAdmin, ensureSuperAdmin } = require('../middleware/auth');
+const { sequelize, User, Project, Group, Activity, Slot, Booking, DispatcherConfig, AdminProjects, DispatcherGroups } = require('../models');
 const { generateCode, getDefaultSections, formatDateTime } = require('../utils/helpers');
 
 // 管理员仪表盘
 router.get('/', ensureAdmin, async (req, res) => {
     try {
-        const projects = await req.user.getManaged_projects();
-        res.render('admin_dash', { projects });
+        const isSuperAdmin = req.user.role === 'superadmin';
+        const projects = isSuperAdmin
+            ? await Project.findAll({ order: [['id', 'ASC']] })
+            : await req.user.getManaged_projects();
+        const users = isSuperAdmin
+            ? await User.findAll({ include: [{ model: Project, as: 'project' }], order: [['id', 'ASC']] })
+            : [];
+        const admins = isSuperAdmin
+            ? await User.findAll({ where: { role: 'admin' }, order: [['id', 'ASC']] })
+            : [];
+        res.render('admin_dash', { projects, is_superadmin: isSuperAdmin, users, admins });
     } catch (error) {
         console.error(error);
         req.flash('info', '获取项目列表失败');
         res.redirect('/');
+    }
+});
+
+// 超级管理员创建管理员
+router.post('/create_admin', ensureSuperAdmin, async (req, res) => {
+    const { username, password } = req.body;
+    if (!username || !password) {
+        req.flash('info', '用户名和密码不能为空');
+        return res.redirect('/admin');
+    }
+
+    try {
+        const existing = await User.findOne({ where: { username } });
+        if (existing) {
+            req.flash('info', '用户名已存在');
+            return res.redirect('/admin');
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        const hash = await bcrypt.hash(password, salt);
+
+        await User.create({
+            username,
+            password_hash: hash,
+            role: 'admin'
+        });
+
+        req.flash('info', `管理员 ${username} 创建成功`);
+        res.redirect('/admin');
+    } catch (error) {
+        console.error(error);
+        req.flash('info', '创建失败');
+        res.redirect('/admin');
+    }
+});
+
+// 超级管理员执行数据库升级
+router.post('/update_db', ensureSuperAdmin, async (req, res) => {
+    try {
+        await sequelize.sync({ alter: true });
+
+        const bookingsWithoutCode = await Booking.findAll({
+            where: { booking_code: null }
+        });
+
+        for (const b of bookingsWithoutCode) {
+            const code = await generateCode(10);
+            await Booking.update(
+                { booking_code: code },
+                { where: { id: b.id } }
+            );
+        }
+
+        req.flash('info', '数据库升级完成');
+        res.redirect('/admin');
+    } catch (error) {
+        console.error(error);
+        req.flash('info', '数据库升级失败');
+        res.redirect('/admin');
+    }
+});
+
+// 超级管理员更新用户
+router.post('/update_user', ensureSuperAdmin, async (req, res) => {
+    const { user_id, role, project_id } = req.body;
+    if (!user_id) {
+        req.flash('info', '用户不存在');
+        return res.redirect('/admin');
+    }
+
+    try {
+        const target = await User.findByPk(user_id);
+        if (!target) {
+            req.flash('info', '用户不存在');
+            return res.redirect('/admin');
+        }
+
+        if (String(target.id) === String(req.user.id) && role && role !== 'superadmin') {
+            req.flash('info', '不能降级当前登录的超级管理员');
+            return res.redirect('/admin');
+        }
+
+        const updateData = {};
+        const newRole = role || target.role;
+        const projectIdValue = project_id ? parseInt(project_id, 10) : null;
+
+        if (newRole === 'dispatcher') {
+            if (!projectIdValue || Number.isNaN(projectIdValue)) {
+                req.flash('info', '放号员必须选择项目');
+                return res.redirect('/admin');
+            }
+            updateData.project_id = projectIdValue;
+            await AdminProjects.destroy({ where: { user_id: target.id } });
+        } else {
+            updateData.project_id = null;
+            await DispatcherGroups.destroy({ where: { user_id: target.id } });
+        }
+
+        if (role) {
+            updateData.role = role;
+            if (role !== 'admin') {
+                await AdminProjects.destroy({ where: { user_id: target.id } });
+            }
+        }
+
+        await User.update(updateData, { where: { id: target.id } });
+        req.flash('info', '用户已更新');
+        res.redirect('/admin');
+    } catch (error) {
+        console.error(error);
+        req.flash('info', '更新失败');
+        res.redirect('/admin');
+    }
+});
+
+// 超级管理员重置用户密码
+router.post('/reset_user_password', ensureSuperAdmin, async (req, res) => {
+    const { user_id, new_password } = req.body;
+    if (!user_id || !new_password) {
+        req.flash('info', '用户和新密码不能为空');
+        return res.redirect('/admin');
+    }
+
+    try {
+        const target = await User.findByPk(user_id);
+        if (!target) {
+            req.flash('info', '用户不存在');
+            return res.redirect('/admin');
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        const hash = await bcrypt.hash(new_password, salt);
+        await User.update({ password_hash: hash }, { where: { id: target.id } });
+
+        req.flash('info', '密码已重置');
+        res.redirect('/admin');
+    } catch (error) {
+        console.error(error);
+        req.flash('info', '重置失败');
+        res.redirect('/admin');
+    }
+});
+
+// 超级管理员删除用户
+router.post('/delete_user', ensureSuperAdmin, async (req, res) => {
+    const { user_id } = req.body;
+    if (!user_id) {
+        req.flash('info', '用户不存在');
+        return res.redirect('/admin');
+    }
+
+    try {
+        const target = await User.findByPk(user_id);
+        if (!target) {
+            req.flash('info', '用户不存在');
+            return res.redirect('/admin');
+        }
+
+        if (String(target.id) === String(req.user.id)) {
+            req.flash('info', '不能删除当前登录用户');
+            return res.redirect('/admin');
+        }
+
+        await AdminProjects.destroy({ where: { user_id: target.id } });
+        await DispatcherGroups.destroy({ where: { user_id: target.id } });
+        await DispatcherConfig.destroy({ where: { dispatcher_id: target.id } });
+        await Slot.destroy({ where: { dispatcher_id: target.id } });
+        await User.destroy({ where: { id: target.id } });
+
+        req.flash('info', '用户已删除');
+        res.redirect('/admin');
+    } catch (error) {
+        console.error(error);
+        req.flash('info', '删除失败');
+        res.redirect('/admin');
+    }
+});
+
+// 超级管理员分配项目给管理员
+router.post('/assign_admin_project', ensureSuperAdmin, async (req, res) => {
+    const { admin_id, project_id } = req.body;
+    if (!admin_id || !project_id) {
+        req.flash('info', '请选择管理员和项目');
+        return res.redirect('/admin');
+    }
+
+    try {
+        const adminUser = await User.findByPk(admin_id);
+        const project = await Project.findByPk(project_id);
+
+        if (!adminUser || adminUser.role !== 'admin') {
+            req.flash('info', '管理员不存在');
+            return res.redirect('/admin');
+        }
+        if (!project) {
+            req.flash('info', '项目不存在');
+            return res.redirect('/admin');
+        }
+
+        const existing = await AdminProjects.findOne({
+            where: { user_id: adminUser.id, project_id: project.id }
+        });
+        if (!existing) {
+            await AdminProjects.create({
+                user_id: adminUser.id,
+                project_id: project.id
+            });
+        }
+
+        req.flash('info', '管理员已绑定项目');
+        res.redirect('/admin');
+    } catch (error) {
+        console.error(error);
+        req.flash('info', '绑定失败');
+        res.redirect('/admin');
+    }
+});
+
+// 超级管理员创建放号员
+router.post('/create_dispatcher_global', ensureSuperAdmin, async (req, res) => {
+    const { username, password, project_id } = req.body;
+    if (!username || !password || !project_id) {
+        req.flash('info', '用户名、密码和项目不能为空');
+        return res.redirect('/admin');
+    }
+
+    try {
+        const project = await Project.findByPk(project_id);
+        if (!project) {
+            req.flash('info', '项目不存在');
+            return res.redirect('/admin');
+        }
+
+        const existing = await User.findOne({ where: { username } });
+        if (existing) {
+            req.flash('info', '用户名已存在');
+            return res.redirect('/admin');
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        const hash = await bcrypt.hash(password, salt);
+
+        await User.create({
+            username,
+            password_hash: hash,
+            role: 'dispatcher',
+            project_id: project.id
+        });
+
+        req.flash('info', '放号员创建成功');
+        res.redirect('/admin');
+    } catch (error) {
+        console.error(error);
+        req.flash('info', '创建失败');
+        res.redirect('/admin');
     }
 });
 
@@ -96,12 +360,13 @@ router.get('/delete_project/:project_id', ensureAdmin, async (req, res) => {
     const { project_id } = req.params;
     
     try {
+        const isSuperAdmin = req.user.role === 'superadmin';
         // 检查权限
         const adminProject = await AdminProjects.findOne({
             where: { user_id: req.user.id, project_id }
         });
         
-        if (!adminProject) {
+        if (!adminProject && !isSuperAdmin) {
             return res.status(403).render('error', { message: '没有权限' });
         }
         
@@ -120,12 +385,13 @@ router.get('/project/:project_id', ensureAdmin, async (req, res) => {
     const { project_id } = req.params;
     
     try {
+        const isSuperAdmin = req.user.role === 'superadmin';
         // 检查权限
         const adminProject = await AdminProjects.findOne({
             where: { user_id: req.user.id, project_id }
         });
         
-        if (!adminProject) {
+        if (!adminProject && !isSuperAdmin) {
             return res.status(403).render('error', { message: '没有权限' });
         }
         
@@ -163,12 +429,13 @@ router.post('/project/:project_id', ensureAdmin, async (req, res) => {
     const { action } = req.body;
     
     try {
+        const isSuperAdmin = req.user.role === 'superadmin';
         // 检查权限
         const adminProject = await AdminProjects.findOne({
             where: { user_id: req.user.id, project_id }
         });
         
-        if (!adminProject) {
+        if (!adminProject && !isSuperAdmin) {
             return res.status(403).render('error', { message: '没有权限' });
         }
         

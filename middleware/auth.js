@@ -9,7 +9,15 @@ const ensureAuthenticated = (req, res, next) => {
 
 // 管理员权限中间件
 const ensureAdmin = (req, res, next) => {
-    if (req.isAuthenticated() && req.user.role === 'admin') {
+    if (req.isAuthenticated() && (req.user.role === 'admin' || req.user.role === 'superadmin')) {
+        return next();
+    }
+    res.status(403).render('error', { message: '没有权限访问此页面' });
+};
+
+// 超级管理员权限中间件
+const ensureSuperAdmin = (req, res, next) => {
+    if (req.isAuthenticated() && req.user.role === 'superadmin') {
         return next();
     }
     res.status(403).render('error', { message: '没有权限访问此页面' });
@@ -17,7 +25,7 @@ const ensureAdmin = (req, res, next) => {
 
 // 放号员权限中间件
 const ensureDispatcher = (req, res, next) => {
-    if (req.isAuthenticated() && req.user.role === 'dispatcher') {
+    if (req.isAuthenticated() && (req.user.role === 'dispatcher' || req.user.role === 'superadmin')) {
         return next();
     }
     res.status(403).render('error', { message: '没有权限访问此页面' });
@@ -26,5 +34,6 @@ const ensureDispatcher = (req, res, next) => {
 module.exports = {
     ensureAuthenticated,
     ensureAdmin,
+    ensureSuperAdmin,
     ensureDispatcher
 };
