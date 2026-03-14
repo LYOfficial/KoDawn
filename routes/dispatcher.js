@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { ensureDispatcher } = require('../middleware/auth');
 const { User, Project, Activity, Slot, Booking, DispatcherConfig, Group } = require('../models');
-const { getLocalNow, formatDateTime } = require('../utils/helpers');
+const { getLocalNow, formatDateTime, parseDateTime, parseDateOnly, getAppWeekdayIndex } = require('../utils/helpers');
 
 // 放号员仪表盘
 router.get('/', ensureDispatcher, async (req, res) => {
@@ -157,8 +157,8 @@ router.post('/manage/:activity_id', ensureDispatcher, async (req, res) => {
         let startDt, endDt;
         
         if (activity.project.time_mode === 'manual') {
-            startDt = new Date(req.body.start_time);
-            endDt = new Date(req.body.end_time);
+            startDt = parseDateTime(req.body.start_time);
+            endDt = parseDateTime(req.body.end_time);
         } else {
             const dateStr = req.body.select_date;
             const timeRange = req.body.time_range;
@@ -168,16 +168,17 @@ router.post('/manage/:activity_id', ensureDispatcher, async (req, res) => {
                 return res.redirect(`/dispatcher/manage/${activity_id}`);
             }
             
-            const selectedDate = new Date(dateStr);
+            const selectedDate = parseDateOnly(dateStr);
             
             // 检查截止日期
-            if (activity.end_date && selectedDate > new Date(activity.end_date)) {
+            if (activity.end_date && selectedDate > parseDateOnly(activity.end_date)) {
                 req.flash('info', `不能设置截止日期(${activity.end_date})之后的时间`);
                 return res.redirect(`/dispatcher/manage/${activity_id}`);
             }
             
             // 检查星期
-            const weekday = String(selectedDate.getDay() === 0 ? 6 : selectedDate.getDay() - 1);
+            const weekdayIndex = getAppWeekdayIndex(dateStr);
+            const weekday = weekdayIndex === null ? '' : String(weekdayIndex);
             const allowedWeekdays = activity.project.allowed_weekdays.split(',');
             if (!allowedWeekdays.includes(weekday)) {
                 req.flash('info', '所选日期的星期不在允许放号范围内');
@@ -185,13 +186,13 @@ router.post('/manage/:activity_id', ensureDispatcher, async (req, res) => {
             }
             
             const [startTime, endTime] = timeRange.split('|');
-            startDt = new Date(`${dateStr} ${startTime}`);
-            endDt = new Date(`${dateStr} ${endTime}`);
+            startDt = parseDateTime(`${dateStr} ${startTime}`);
+            endDt = parseDateTime(`${dateStr} ${endTime}`);
         }
         
         // 手动模式也检查截止日期
         if (activity.project.time_mode === 'manual' && activity.end_date) {
-            if (startDt > new Date(activity.end_date)) {
+            if (startDt > parseDateOnly(activity.end_date)) {
                 req.flash('info', `不能设置截止日期(${activity.end_date})之后的时间`);
                 return res.redirect(`/dispatcher/manage/${activity_id}`);
             }

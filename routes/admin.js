@@ -2,13 +2,20 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const { ensureAdmin, ensureSuperAdmin } = require('../middleware/auth');
-const { sequelize, User, Project, Group, Activity, Slot, Booking, DispatcherConfig, AdminProjects, DispatcherGroups } = require('../models');
-const { generateCode, getDefaultSections, formatDateTime } = require('../utils/helpers');
+const { sequelize, User, Project, Group, Activity, Slot, Booking, DispatcherConfig, AdminProjects, DispatcherGroups, AppConfig } = require('../models');
+const { generateCode, getDefaultSections, formatDateTime, parseDateTime, getAppTimezone, setAppTimezone } = require('../utils/helpers');
 
 // 管理员仪表盘
 router.get('/', ensureAdmin, async (req, res) => {
     try {
         const isSuperAdmin = req.user.role === 'superadmin';
+        let appTimezone = getAppTimezone();
+        if (isSuperAdmin) {
+            const config = await AppConfig.findOne({ where: { key: 'timezone' } });
+            if (config && config.value) {
+                appTimezone = config.value;
+            }
+        }
         const projects = isSuperAdmin
             ? await Project.findAll({ order: [['id', 'ASC']] })
             : await req.user.getManaged_projects();
@@ -18,11 +25,44 @@ router.get('/', ensureAdmin, async (req, res) => {
         const admins = isSuperAdmin
             ? await User.findAll({ where: { role: 'admin' }, order: [['id', 'ASC']] })
             : [];
-        res.render('admin_dash', { projects, is_superadmin: isSuperAdmin, users, admins });
+        res.render('admin_dash', { projects, is_superadmin: isSuperAdmin, users, admins, app_timezone: appTimezone });
     } catch (error) {
         console.error(error);
         req.flash('info', '获取项目列表失败');
         res.redirect('/');
+    }
+});
+
+// 超级管理员更新平台时区
+router.post('/update_timezone', ensureSuperAdmin, async (req, res) => {
+    const { timezone } = req.body;
+    if (!timezone) {
+        req.flash('info', '时区不能为空');
+        return res.redirect('/admin');
+    }
+
+    try {
+        try {
+            new Intl.DateTimeFormat('en-US', { timeZone: timezone });
+        } catch (e) {
+            req.flash('info', '无效的时区标识，请使用 IANA 格式');
+            return res.redirect('/admin');
+        }
+
+        const existing = await AppConfig.findOne({ where: { key: 'timezone' } });
+        if (existing) {
+            await AppConfig.update({ value: timezone }, { where: { key: 'timezone' } });
+        } else {
+            await AppConfig.create({ key: 'timezone', value: timezone });
+        }
+        setAppTimezone(timezone);
+
+        req.flash('info', '平台时区已更新');
+        res.redirect('/admin');
+    } catch (error) {
+        console.error(error);
+        req.flash('info', '更新时区失败');
+        res.redirect('/admin');
     }
 });
 
@@ -549,8 +589,8 @@ router.post('/project/:project_id', ensureAdmin, async (req, res) => {
                 name,
                 code,
                 project_id: project.id,
-                start_time: start_time ? new Date(start_time) : null,
-                end_time: end_time ? new Date(end_time) : null
+                start_time: start_time ? parseDateTime(start_time) : null,
+                end_time: end_time ? parseDateTime(end_time) : null
             });
             
             req.flash('info', `活动创建成功，编号：${code}`);

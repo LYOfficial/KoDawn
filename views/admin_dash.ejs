@@ -77,6 +77,31 @@
     </form>
 </div>
 
+<div class="card p-3 mb-4 border-info">
+    <h6 class="text-info">平台时区设置</h6>
+    <form action="/admin/update_timezone" method="POST" class="row g-2 align-items-center">
+        <div class="col-8">
+            <input type="text" name="timezone" class="form-control" list="timezoneList" value="<%= app_timezone || '' %>" placeholder="例如: Asia/Shanghai" required>
+            <datalist id="timezoneList">
+                <option value="Asia/Shanghai"></option>
+                <option value="Asia/Taipei"></option>
+                <option value="Asia/Tokyo"></option>
+                <option value="Asia/Singapore"></option>
+                <option value="Asia/Seoul"></option>
+                <option value="Europe/London"></option>
+                <option value="Europe/Paris"></option>
+                <option value="America/New_York"></option>
+                <option value="America/Los_Angeles"></option>
+                <option value="Australia/Sydney"></option>
+            </datalist>
+            <div class="form-text small">使用 IANA 时区标识，保存后将统一平台时间显示与计算。</div>
+        </div>
+        <div class="col-4">
+            <button type="submit" class="btn btn-info text-white w-100">保存时区</button>
+        </div>
+    </form>
+</div>
+
 <div class="card p-3 mb-4">
     <h6 class="text-primary">用户列表</h6>
     <div class="table-responsive">

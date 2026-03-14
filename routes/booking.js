@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { Activity, Project, Slot, Booking, DispatcherConfig, User, Group } = require('../models');
-const { generateCode, getLocalNow, formatDateTime } = require('../utils/helpers');
+const { generateCode, getLocalNow, formatDateTime, parseDateOnly } = require('../utils/helpers');
 
 // 活动入口
 router.post('/book_entry', async (req, res) => {
@@ -52,7 +52,7 @@ router.get('/book/:code_str', async (req, res) => {
         if (activity.end_time && now > new Date(activity.end_time)) {
             ended = true;
         }
-        if (activity.end_date && new Date(activity.end_date) < now) {
+        if (activity.end_date && parseDateOnly(activity.end_date) < now) {
             ended = true;
         }
         
@@ -197,7 +197,7 @@ router.get('/book/:code_str/slot/:slot_id', async (req, res) => {
             req.flash('info', '活动已结束');
             return res.redirect(`/book/${code_str}`);
         }
-        if (activity.end_date && new Date(activity.end_date) < now) {
+        if (activity.end_date && parseDateOnly(activity.end_date) < now) {
             req.flash('info', '活动已结束');
             return res.redirect(`/book/${code_str}`);
         }

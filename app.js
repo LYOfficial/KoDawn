@@ -14,6 +14,7 @@ const app = express();
 
 // 数据库和模型
 const { sequelize } = require('./models');
+const { loadAppTimezone } = require('./utils/helpers');
 
 // 配置Session存储
 const sessionStore = new SequelizeStore({
@@ -89,6 +90,8 @@ async function startServer() {
         await sequelize.sync();
         // 同步Session表
         await sessionStore.sync();
+        // 载入平台时区配置
+        await loadAppTimezone();
         
         app.listen(PORT, '0.0.0.0', () => {
             console.log(`🚀 KoDawn 服务器运行在 http://localhost:${PORT}`);

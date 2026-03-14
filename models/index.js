@@ -244,6 +244,21 @@ const Booking = sequelize.define('Booking', {
     timestamps: false
 });
 
+// 定义AppConfig模型
+const AppConfig = sequelize.define('AppConfig', {
+    key: {
+        type: DataTypes.STRING(50),
+        primaryKey: true
+    },
+    value: {
+        type: DataTypes.STRING(200),
+        allowNull: true
+    }
+}, {
+    tableName: 'app_config',
+    timestamps: false
+});
+
 // 定义Admin-Project关联表
 const AdminProjects = sequelize.define('AdminProjects', {
     user_id: {
@@ -323,6 +338,7 @@ module.exports = {
     DispatcherConfig,
     Slot,
     Booking,
+    AppConfig,
     AdminProjects,
     DispatcherGroups
 };
