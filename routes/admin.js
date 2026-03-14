@@ -454,6 +454,7 @@ router.get('/project/:project_id', ensureAdmin, async (req, res) => {
             project, 
             sections, 
             allowed_wd,
+            is_superadmin: isSuperAdmin,
             formatDateTime,
             formatDateTimeInput
         });
@@ -621,6 +622,10 @@ router.post('/project/:project_id', ensureAdmin, async (req, res) => {
             req.flash('info', '活动已更新');
         }
         else if (action === 'update_activity_offset') {
+            if (req.user.role !== 'superadmin') {
+                req.flash('info', '只有超级管理员可以进行批量时间校准');
+                return res.redirect(`/admin/project/${project_id}`);
+            }
             const { activity_id, offset_hours } = req.body;
             const offsetHours = parseFloat(offset_hours);
 

@@ -53,6 +53,7 @@
                         <button class="btn btn-sm btn-outline-primary w-100">保存</button>
                     </div>
                 </form>
+                <% if (typeof is_superadmin !== 'undefined' && is_superadmin) { %>
                 <form method="POST" class="row g-2 align-items-center mt-2">
                     <input type="hidden" name="action" value="update_activity_offset">
                     <input type="hidden" name="activity_id" value="<%= act.id %>">
@@ -67,6 +68,7 @@
                         <button class="btn btn-sm btn-outline-warning w-100">批量校准</button>
                     </div>
                 </form>
+                <% } %>
             </div>
             <% }); %>
         <% } %>
