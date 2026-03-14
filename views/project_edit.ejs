@@ -22,19 +22,37 @@
     <div class="list-group">
         <% if (project.activities && project.activities.length > 0) { %>
             <% project.activities.forEach(function(act) { %>
-            <div class="list-group-item d-flex justify-content-between align-items-center">
-                <div>
-                    <span class="fw-bold"><%= act.name %></span> <span class="badge bg-secondary"><%= act.code %></span>
-                    <br>
-                    <small class="text-muted">
-                        <% if (act.start_time) { %>开始: <%= formatDateTime(act.start_time) %><% } %>
-                        <% if (act.end_time) { %> | 截止: <%= formatDateTime(act.end_time) %><% } %>
-                    </small>
+            <div class="list-group-item">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="fw-bold"><%= act.name %></span> <span class="badge bg-secondary"><%= act.code %></span>
+                        <br>
+                        <small class="text-muted">
+                            <% if (act.start_time) { %>开始: <%= formatDateTime(act.start_time) %><% } %>
+                            <% if (act.end_time) { %> | 截止: <%= formatDateTime(act.end_time) %><% } %>
+                        </small>
+                    </div>
+                    <div>
+                        <a href="/admin/activity/<%= act.id %>" class="btn btn-sm btn-info text-white me-2">数据</a>
+                        <a href="/admin/delete_activity/<%= act.id %>" class="btn btn-sm btn-outline-danger" onclick="return confirm('确定删除？')">删除</a>
+                    </div>
                 </div>
-                <div>
-                    <a href="/admin/activity/<%= act.id %>" class="btn btn-sm btn-info text-white me-2">数据</a>
-                    <a href="/admin/delete_activity/<%= act.id %>" class="btn btn-sm btn-outline-danger" onclick="return confirm('确定删除？')">删除</a>
-                </div>
+                <form method="POST" class="row g-2 align-items-center mt-2">
+                    <input type="hidden" name="action" value="update_activity">
+                    <input type="hidden" name="activity_id" value="<%= act.id %>">
+                    <div class="col-md-4">
+                        <input type="text" name="name" class="form-control form-control-sm" value="<%= act.name %>" required>
+                    </div>
+                    <div class="col-md-3">
+                        <input type="datetime-local" name="start_time" class="form-control form-control-sm" value="<%= formatDateTimeInput(act.start_time) %>">
+                    </div>
+                    <div class="col-md-3">
+                        <input type="datetime-local" name="end_time" class="form-control form-control-sm" value="<%= formatDateTimeInput(act.end_time) %>">
+                    </div>
+                    <div class="col-md-2">
+                        <button class="btn btn-sm btn-outline-primary w-100">保存</button>
+                    </div>
+                </form>
             </div>
             <% }); %>
         <% } %>

@@ -154,6 +154,18 @@ function formatDateTime(date, format = 'full') {
 }
 
 /**
+ * 格式化为 datetime-local 可用字符串
+ * @param {Date} date - 日期对象
+ */
+function formatDateTimeInput(date) {
+    if (!date) return '';
+    const d = new Date(date);
+    const timezone = getAppTimezone();
+    const parts = getZonedParts(d, timezone);
+    return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
+}
+
+/**
  * 解析日期时间字符串
  * @param {string} str - 日期时间字符串 (YYYY-MM-DDTHH:MM)
  */
@@ -208,6 +220,7 @@ module.exports = {
     generateCode,
     getDefaultSections,
     formatDateTime,
+    formatDateTimeInput,
     parseDateTime,
     parseDateOnly,
     getAppWeekdayIndex,

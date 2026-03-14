@@ -3,7 +3,7 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const { ensureAdmin, ensureSuperAdmin } = require('../middleware/auth');
 const { sequelize, User, Project, Group, Activity, Slot, Booking, DispatcherConfig, AdminProjects, DispatcherGroups, AppConfig } = require('../models');
-const { generateCode, getDefaultSections, formatDateTime, parseDateTime, getAppTimezone, setAppTimezone } = require('../utils/helpers');
+const { generateCode, getDefaultSections, formatDateTime, formatDateTimeInput, parseDateTime, getAppTimezone, setAppTimezone } = require('../utils/helpers');
 
 // 管理员仪表盘
 router.get('/', ensureAdmin, async (req, res) => {
@@ -454,7 +454,8 @@ router.get('/project/:project_id', ensureAdmin, async (req, res) => {
             project, 
             sections, 
             allowed_wd,
-            formatDateTime
+            formatDateTime,
+            formatDateTimeInput
         });
     } catch (error) {
         console.error(error);
@@ -594,6 +595,30 @@ router.post('/project/:project_id', ensureAdmin, async (req, res) => {
             });
             
             req.flash('info', `活动创建成功，编号：${code}`);
+        }
+        else if (action === 'update_activity') {
+            const { activity_id, name, start_time, end_time } = req.body;
+            if (!activity_id) {
+                req.flash('info', '活动不存在');
+                return res.redirect(`/admin/project/${project_id}`);
+            }
+
+            const activity = await Activity.findOne({
+                where: { id: activity_id, project_id: project.id }
+            });
+
+            if (!activity) {
+                req.flash('info', '活动不存在');
+                return res.redirect(`/admin/project/${project_id}`);
+            }
+
+            await Activity.update({
+                name: name || activity.name,
+                start_time: start_time ? parseDateTime(start_time) : null,
+                end_time: end_time ? parseDateTime(end_time) : null
+            }, { where: { id: activity.id } });
+
+            req.flash('info', '活动已更新');
         }
         else if (action === 'delete_project') {
             await Project.destroy({ where: { id: project_id } });
