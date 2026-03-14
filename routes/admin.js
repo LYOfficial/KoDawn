@@ -620,6 +620,59 @@ router.post('/project/:project_id', ensureAdmin, async (req, res) => {
 
             req.flash('info', '活动已更新');
         }
+        else if (action === 'update_activity_offset') {
+            const { activity_id, offset_hours } = req.body;
+            const offsetHours = parseFloat(offset_hours);
+
+            if (!activity_id) {
+                req.flash('info', '活动不存在');
+                return res.redirect(`/admin/project/${project_id}`);
+            }
+
+            if (Number.isNaN(offsetHours) || offsetHours === 0) {
+                req.flash('info', '请输入非零的小时偏移量');
+                return res.redirect(`/admin/project/${project_id}`);
+            }
+
+            const activity = await Activity.findOne({
+                where: { id: activity_id, project_id: project.id }
+            });
+
+            if (!activity) {
+                req.flash('info', '活动不存在');
+                return res.redirect(`/admin/project/${project_id}`);
+            }
+
+            const offsetMs = offsetHours * 60 * 60 * 1000;
+
+            await sequelize.transaction(async (t) => {
+                const updatedActivity = {};
+                if (activity.start_time) {
+                    updatedActivity.start_time = new Date(new Date(activity.start_time).getTime() + offsetMs);
+                }
+                if (activity.end_time) {
+                    updatedActivity.end_time = new Date(new Date(activity.end_time).getTime() + offsetMs);
+                }
+                if (Object.keys(updatedActivity).length > 0) {
+                    await Activity.update(updatedActivity, { where: { id: activity.id }, transaction: t });
+                }
+
+                const slots = await Slot.findAll({
+                    where: { activity_id: activity.id },
+                    transaction: t
+                });
+
+                for (const slot of slots) {
+                    const slotUpdate = {
+                        start_time: new Date(new Date(slot.start_time).getTime() + offsetMs),
+                        end_time: new Date(new Date(slot.end_time).getTime() + offsetMs)
+                    };
+                    await Slot.update(slotUpdate, { where: { id: slot.id }, transaction: t });
+                }
+            });
+
+            req.flash('info', '活动与号源时间已批量偏移');
+        }
         else if (action === 'delete_project') {
             await Project.destroy({ where: { id: project_id } });
             req.flash('info', '项目已删除');

@@ -53,6 +53,20 @@
                         <button class="btn btn-sm btn-outline-primary w-100">保存</button>
                     </div>
                 </form>
+                <form method="POST" class="row g-2 align-items-center mt-2">
+                    <input type="hidden" name="action" value="update_activity_offset">
+                    <input type="hidden" name="activity_id" value="<%= act.id %>">
+                    <div class="col-md-4">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text">整体偏移(小时)</span>
+                            <input type="number" name="offset_hours" class="form-control" step="0.5" placeholder="例如: -8 或 2" required>
+                        </div>
+                        <div class="form-text small">会同时偏移活动开始/结束和已发布号源时间。</div>
+                    </div>
+                    <div class="col-md-2">
+                        <button class="btn btn-sm btn-outline-warning w-100">批量校准</button>
+                    </div>
+                </form>
             </div>
             <% }); %>
         <% } %>
